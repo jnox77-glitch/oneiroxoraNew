@@ -1,17 +1,27 @@
 import { useState, useRef, useEffect } from "react";
+import { createClient } from "@supabase/supabase-js";
 
 // ─── DATA ────────────────────────────────────────────────────────────────────
-const USERS = [
-  { id:1, username:"admin",      password:"Onr!Adm7429",  role:"admin",     name:"Διοίκηση",   initials:"Δ" },
-  { id:2, username:"grammateia", password:"Onr!Grm5183",  role:"secretary", name:"Γραμματεία", initials:"Γ" },
-  { id:3, username:"vrefikoA",   password:"Onr!VrA2967",  role:"teacher",   name:"Δασκάλα Βρεφικού Α", initials:"ΒΑ", tmima_id:"vr-a", tmima:"Βρεφικό Α" },
-  { id:4, username:"vrefikoB",   password:"Onr!VrB4058",  role:"teacher",   name:"Δασκάλα Βρεφικού Β", initials:"ΒΒ", tmima_id:"vr-b", tmima:"Βρεφικό Β" },
-  { id:5, username:"vrefikoC",   password:"Onr!VrC6392",  role:"teacher",   name:"Δασκάλα Βρεφικού Γ", initials:"ΒΓ", tmima_id:"vr-c", tmima:"Βρεφικό Γ" },
-  { id:6, username:"paidikoA",   password:"Onr!PaA8514",  role:"teacher",   name:"Δασκάλα Παιδικού Α", initials:"ΠΑ", tmima_id:"pa-a", tmima:"Παιδικό Α" },
-  { id:7, username:"paidikoB",   password:"Onr!PaB3720",  role:"teacher",   name:"Δασκάλα Παιδικού Β", initials:"ΠΒ", tmima_id:"pa-b", tmima:"Παιδικό Β" },
+// Λογαριασμοί ΜΟΝΟ για τη δοκιμαστική λειτουργία (?demo=1). Δεν είναι πραγματικοί κωδικοί.
+const DEMO_USERS = [
+  { id:1, username:"admin",      password:"demo1234", role:"admin",     name:"Διοίκηση",   initials:"Δ" },
+  { id:2, username:"grammateia", password:"demo1234", role:"secretary", name:"Γραμματεία", initials:"Γ" },
+  { id:3, username:"vrefikoA",   password:"demo1234", role:"teacher",   name:"Δασκάλα Βρεφικού Α", initials:"ΒΑ", tmima_id:"vr-a", tmima:"Βρεφικό Α" },
+  { id:4, username:"vrefikoB",   password:"demo1234", role:"teacher",   name:"Δασκάλα Βρεφικού Β", initials:"ΒΒ", tmima_id:"vr-b", tmima:"Βρεφικό Β" },
+  { id:5, username:"vrefikoC",   password:"demo1234", role:"teacher",   name:"Δασκάλα Βρεφικού Γ", initials:"ΒΓ", tmima_id:"vr-c", tmima:"Βρεφικό Γ" },
+  { id:6, username:"paidikoA",   password:"demo1234", role:"teacher",   name:"Δασκάλα Παιδικού Α", initials:"ΠΑ", tmima_id:"pa-a", tmima:"Παιδικό Α" },
+  { id:7, username:"paidikoB",   password:"demo1234", role:"teacher",   name:"Δασκάλα Παιδικού Β", initials:"ΠΒ", tmima_id:"pa-b", tmima:"Παιδικό Β" },
 ];
-// Σημείωση: Οι λογαριασμοί γονέων ΔΕΝ δημιουργούνται εδώ.
-// Κάθε γονέας παίρνει username/κωδικό όταν καταχωρείτε το παιδί του στο Μητρώο (Βήμα 3 της φόρμας).
+// Προτεινόμενοι λογαριασμοί προσωπικού — δημιουργούνται με ένα κουμπί από τη σελίδα «Χρήστες»
+// (οι κωδικοί παράγονται τυχαία εκείνη τη στιγμή, δεν υπάρχουν στον κώδικα).
+const DEFAULT_STAFF = [
+  { username:"grammateia", role:"secretary", name:"Γραμματεία", initials:"Γ" },
+  { username:"vrefikoa",   role:"teacher", name:"Δασκάλα Βρεφικού Α", initials:"ΒΑ", tmima_id:"vr-a" },
+  { username:"vrefikob",   role:"teacher", name:"Δασκάλα Βρεφικού Β", initials:"ΒΒ", tmima_id:"vr-b" },
+  { username:"vrefikoc",   role:"teacher", name:"Δασκάλα Βρεφικού Γ", initials:"ΒΓ", tmima_id:"vr-c" },
+  { username:"paidikoa",   role:"teacher", name:"Δασκάλα Παιδικού Α", initials:"ΠΑ", tmima_id:"pa-a" },
+  { username:"paidikob",   role:"teacher", name:"Δασκάλα Παιδικού Β", initials:"ΠΒ", tmima_id:"pa-b" },
+];
 
 
 
@@ -23,7 +33,8 @@ const TMIMATA = [
   { id:"pa-b", name:"Παιδικό Β", type:"paidiko", capacity:20, teacher:"Δήμητρα Αλεξίου",    color:"#C9B8A8" },
 ];
 
-const TODAY = new Date().toISOString().split("T")[0];
+const localISO = (d=new Date()) => { const z=n=>String(n).padStart(2,"0"); return `${d.getFullYear()}-${z(d.getMonth()+1)}-${z(d.getDate())}`; };
+const TODAY = localISO();
 const todayGR = new Date().toLocaleDateString("el-GR",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
 
 // Τα παιδιά προστίθενται από το Μητρώο (κενό μέχρι να καταχωρηθούν πραγματικά)
@@ -49,7 +60,7 @@ function genDemoKids(){
   const sleeps=["30 λεπτά","1 ώρα","1:30","2 ώρες","2:30","3 ώρες","Δεν κοιμήθηκε"];
   const moods=["😊 Χαρούμενο","😄 Πολύ χαρούμενο","😊 Χαρούμενο","😐 Ουδέτερο","😴 Κουρασμένο"];
   const notes=["Σήμερα έπαιξε πολύ με τα τουβλάκια.","Είχε λίγο κλάμα το πρωί αλλά ηρέμησε γρήγορα.","Τραγούδησε μαζί με τους φίλους του.","Ζωγράφισε ένα όμορφο σχέδιο!","Ήταν πολύ κοινωνικό και χαρούμενο.","","",""];
-  const dateOffset = (days)=>{ const d=new Date(); d.setDate(d.getDate()-days); return d.toISOString().split("T")[0]; };
+  const dateOffset = (days)=>{ const d=new Date(); d.setDate(d.getDate()-days); return localISO(d); };
   const plan=[["vr-a",10],["vr-b",10],["vr-c",10],["pa-a",13],["pa-b",13]];
   const families=shuffle(fam);
   const out=[]; let n=0;
@@ -112,14 +123,168 @@ const SEC_MSGS = [];
 
 const ROUTES = [];
 
-// ─── SHARED PARENT↔TEACHER MESSAGES (admin sees all) ─────────────────────────
-// Simple module-level store with subscribers so any component can react to new messages.
+// ─── ΣΥΝΔΕΣΗ ΜΕ ΒΑΣΗ ΔΕΔΟΜΕΝΩΝ (Supabase) ──────────────────────────────────────
+// Το URL και το «publishable» κλειδί είναι δημόσια εξ ορισμού. Η ασφάλεια των δεδομένων
+// προέρχεται από τους κανόνες (RLS) μέσα στη βάση, όχι από την απόκρυψη του κλειδιού.
+const SB_URL = "https://wqwrehdmwzqpdvqdtbvx.supabase.co";
+const SB_KEY = "sb_publishable_VioUUk4a6IKQyxHFrRHYLA_DqFp-8lk";
+const REMEMBER_KEY = "oneiro_remember";
+const store = (kind) => { try { return window[kind]; } catch { return null; } };
+const sGet = (kind,k) => { try { return store(kind).getItem(k); } catch { return null; } };
+const sSet = (kind,k,v) => { try { store(kind).setItem(k,v); } catch {} };
+const sDel = (kind,k) => { try { store(kind).removeItem(k); } catch {} };
+// Αν ο χρήστης δεν θέλει «Να με θυμάσαι», η σύνδεση κρατιέται μόνο όσο είναι ανοιχτή η καρτέλα.
+const sbStorage = {
+  getItem: (k) => sGet("localStorage",k) ?? sGet("sessionStorage",k),
+  setItem: (k,v) => { sDel("localStorage",k); sDel("sessionStorage",k); sSet(sGet("localStorage",REMEMBER_KEY)==="1"?"localStorage":"sessionStorage",k,v); },
+  removeItem: (k) => { sDel("localStorage",k); sDel("sessionStorage",k); },
+};
+const sb = DEMO ? null : createClient(SB_URL, SB_KEY, { auth:{ persistSession:true, autoRefreshToken:true, detectSessionInUrl:false, storage:sbStorage } });
+
+// Το όνομα χρήστη γίνεται εσωτερικό «email» (δεν στέλνεται ποτέ email)
+const emailOf = (u) => `${String(u||"").trim().toLowerCase()}@oneirochora.app`;
+const toUser = (p) => ({
+  id:p.id, username:p.username, role:p.role, name:p.name,
+  initials:p.initials || (p.name||"?").trim().charAt(0),
+  tmima_id:p.tmima_id||undefined, tmima:TMIMATA.find(t=>t.id===p.tmima_id)?.name,
+  child_id:p.child_id==null?undefined:Number(p.child_id),
+});
+
+// Κλήση στη λειτουργία διαχείρισης χρηστών (δημιουργία/αλλαγή/διαγραφή λογαριασμών)
+async function sbAdmin(action, payload){
+  const { data, error } = await sb.functions.invoke("manage-users", { body:{ action, ...payload } });
+  if(error){
+    let msg = error.message || "Άγνωστο σφάλμα";
+    try { const j = await error.context.json(); if(j?.error) msg = j.error; } catch {}
+    throw new Error(msg);
+  }
+  if(data?.error) throw new Error(data.error);
+  return data;
+}
+
+// Ποια πεδία του παιδιού είναι «ευαίσθητα» (μόνο Διοίκηση/Γραμματεία)
+const PRIVATE_RE = /^(pat_afm|pat_doy|mit_afm|mit_doy|didaktra|amount|par_.*)$/;
+const NOT_STORED = new Set(["id","daily_reports","parent_password"]);
+const stable = (o) => JSON.stringify(o, (k,v)=> (v && typeof v==="object" && !Array.isArray(v)) ? Object.fromEntries(Object.keys(v).sort().map(x=>[x,v[x]])) : v);
+// Οι φωτογραφίες από τον υπολογιστή (blob:) δεν αποθηκεύονται — έρχεται σύντομα με πραγματικό ανέβασμα
+const cleanReport = (r) => { const { date, ...rest } = r; return { ...rest, media:(rest.media||[]).filter(m=>m && m.url && !String(m.url).startsWith("blob:")) }; };
+function splitKid(k){
+  const core={}, priv={};
+  for(const [key,val] of Object.entries(k)){
+    if(NOT_STORED.has(key)) continue;
+    if(PRIVATE_RE.test(key)) priv[key]=val; else core[key]=val;
+  }
+  core.present_date = TODAY;   // η «παρουσία» ισχύει μόνο για τη σημερινή μέρα
+  return { core, priv };
+}
+async function fetchAllRows(build){
+  const out=[];
+  for(let from=0;;from+=1000){
+    const { data, error } = await build().range(from, from+999);
+    if(error) throw error;
+    out.push(...data);
+    if(data.length<1000) break;
+  }
+  return out;
+}
+async function sbLoadKids(role){
+  const office = role==="admin"||role==="secretary";
+  const since = localISO(new Date(Date.now()-60*864e5));
+  const [kr, pr, rr] = await Promise.all([
+    fetchAllRows(()=>sb.from("kids").select("id,tmima,data").order("id")),
+    office ? fetchAllRows(()=>sb.from("kids_private").select("kid_id,data").order("kid_id")) : Promise.resolve([]),
+    fetchAllRows(()=>sb.from("daily_reports").select("kid_id,date,data").gte("date",since).order("date",{ascending:false}).order("kid_id")),
+  ]);
+  const privBy = new Map(pr.map(x=>[Number(x.kid_id),x.data||{}]));
+  const repBy = new Map();
+  rr.forEach(x=>{ const id=Number(x.kid_id); if(!repBy.has(id)) repBy.set(id,[]); repBy.get(id).push({ ...(x.data||{}), date:x.date }); });
+  const kids = kr.map(row=>{
+    const id=Number(row.id), d=row.data||{};
+    return { ...(privBy.get(id)||{}), ...d, id, tmima:row.tmima, present: !!d.present && d.present_date===TODAY, daily_reports: repBy.get(id)||[] };
+  });
+  const snap = new Map();
+  kids.forEach(k=>{
+    const { core, priv } = splitKid(k);
+    const reports = new Map((k.daily_reports||[]).map(r=>[r.date, stable(cleanReport(r))]));
+    snap.set(k.id, { core:stable(core), priv:stable(priv), tmima:k.tmima, reports });
+  });
+  return { kids, snap };
+}
+// Στέλνει στη βάση ΜΟΝΟ ό,τι άλλαξε από την τελευταία αποθήκευση
+async function sbFlushKids(kids, snap, role){
+  const office = role==="admin"||role==="secretary";
+  const ins=[], upd=[], priv=[], reps=[], dels=[];
+  const next = new Map();
+  const curIds = new Set();
+  for(const k of kids){
+    curIds.add(k.id);
+    const { core, priv:pv } = splitKid(k);
+    const cs=stable(core), ps=stable(pv), old=snap.get(k.id);
+    const repMap = new Map();
+    (k.daily_reports||[]).forEach(r=>{
+      const cr=cleanReport(r), str=stable(cr); repMap.set(r.date,str);
+      if(!old || old.reports.get(r.date)!==str) reps.push({ kid_id:k.id, date:r.date, data:cr });
+    });
+    if(!old) ins.push({ id:k.id, tmima:k.tmima, data:core });
+    else if(old.core!==cs || old.tmima!==k.tmima) upd.push({ id:k.id, tmima:k.tmima, data:core });
+    if(office && ps!=="{}" && (!old || old.priv!==ps)) priv.push({ kid_id:k.id, data:pv });
+    next.set(k.id, { core:cs, priv: office ? ps : (old?.priv ?? ps), tmima:k.tmima, reports:repMap });
+  }
+  if(office) snap.forEach((_,id)=>{ if(!curIds.has(id)) dels.push(id); });
+  if(!ins.length && !upd.length && !priv.length && !reps.length && !dels.length) return false;
+  if(ins.length){ const { error } = await sb.from("kids").upsert(ins,{ onConflict:"id" }); if(error) throw error; }
+  for(const u of upd){ const { error } = await sb.from("kids").update({ tmima:u.tmima, data:u.data }).eq("id",u.id); if(error) throw error; }
+  if(priv.length){ const { error } = await sb.from("kids_private").upsert(priv,{ onConflict:"kid_id" }); if(error) throw error; }
+  if(reps.length){ const { error } = await sb.from("daily_reports").upsert(reps,{ onConflict:"kid_id,date" }); if(error) throw error; }
+  if(dels.length){ const { error } = await sb.from("kids").delete().in("id",dels); if(error) throw error; }
+  snap.clear(); next.forEach((v,k)=>snap.set(k,v));
+  return true;
+}
+
+// ─── ΜΗΝΥΜΑΤΑ ΓΟΝΕΑ ↔ ΔΑΣΚΑΛΑΣ / ΔΙΟΙΚΗΣΗΣ ─────────────────────────────────────
+// Κοινό «μαγαζί» μηνυμάτων: οποιοδήποτε component μπορεί να αντιδράσει σε νέα μηνύματα.
+// Με σύνδεση στη βάση, τα μηνύματα αποθηκεύονται και φτάνουν σε πραγματικό χρόνο.
 const PT_MESSAGES = {
   list: [],
   subs: [],
+  notify(evt){ this.subs.forEach(fn=>{ try{ fn(evt); }catch(e){} }); },
+  setAll(rows){ this.list = rows; this.notify({ type:"reset" }); },
   add(msg){
-    this.list = [{...msg, id:Date.now()}, ...this.list];
-    this.subs.forEach(fn=>{ try{ fn(); }catch(e){} });
+    if(!sb){
+      const m = { ...msg, id:Date.now()+Math.random() };
+      this.list = [m, ...this.list];
+      this.notify({ type:"new", msg:m });
+      return;
+    }
+    const tmp = { ...msg, id:"tmp-"+Date.now()+"-"+Math.random() };
+    this.list = [tmp, ...this.list];
+    this.notify({ type:"local", msg:tmp });
+    sb.from("pt_messages").insert({
+      from_role:msg.from_role, from_name:msg.from_name, child_id:msg.child_id, child_name:msg.child_name||null,
+      to_teacher:msg.to_teacher||null, tmima:msg.tmima||null, text:msg.text, date:msg.date||null, time:msg.time||null, read:false,
+    }).select().single().then(({ data, error })=>{
+      if(error){
+        this.list = this.list.filter(x=>x.id!==tmp.id); this.notify({ type:"reset" });
+        alert("⚠️ Το μήνυμα ΔΕΝ στάλθηκε: "+error.message);
+      } else {
+        this.list = this.list.map(x=>x.id===tmp.id?data:x); this.notify({ type:"change" });
+      }
+    });
+  },
+  markRead(id){
+    this.list = this.list.map(x=>x.id===id?{ ...x, read:true }:x);
+    this.notify({ type:"change" });
+    if(sb && typeof id==="number") sb.from("pt_messages").update({ read:true }).eq("id",id).then(({ error })=>{ if(error) console.error(error); });
+  },
+  receive(row, myUid){            // μήνυμα από άλλον χρήστη (πραγματικός χρόνος)
+    if(row.from_user && row.from_user===myUid) return;
+    if(this.list.some(x=>x.id===row.id)) return;
+    this.list = [row, ...this.list];
+    this.notify({ type:"new", msg:row });
+  },
+  receiveUpdate(row){
+    this.list = this.list.map(x=>x.id===row.id?{ ...x, ...row }:x);
+    this.notify({ type:"change" });
   },
   subscribe(fn){ this.subs.push(fn); return ()=>{ this.subs = this.subs.filter(f=>f!==fn); }; },
 };
@@ -372,6 +537,13 @@ button:focus-visible, .nav-item:focus-visible { outline:2px solid #F5B800; outli
 .topbar-l p { font-size:12px; color:var(--text3); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .topbar-r { display:flex; align-items:center; gap:10px; flex-shrink:0; }
 .top-date { display:inline-flex; align-items:center; gap:7px; background:var(--green3); color:var(--green); padding:7px 14px; border-radius:20px; font-size:12px; font-weight:600; border:1px solid rgba(45,106,45,.12); }
+.sync-chip { font-size:11.5px; font-weight:700; padding:6px 12px; border-radius:20px; white-space:nowrap; }
+.sync-saving { background:#EEF2FF; color:#4F46E5; }
+.sync-saved { background:#ECFDF5; color:#047857; }
+.sync-error { background:#FEF2F2; color:#B91C1C; cursor:pointer; border:1px solid #FECACA; }
+.boot { min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; color:var(--text3); font-size:14px; }
+.boot-spin { width:34px; height:34px; border-radius:50%; border:3px solid var(--beige3); border-top-color:var(--green); animation:spin .8s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
 .demo-chip { background:#FFF4CC; color:#8A6400; border:1px solid #F0D68A; font-size:10.5px; font-weight:800; letter-spacing:.08em; padding:5px 10px; border-radius:20px; white-space:nowrap; }
 .top-notif { width:40px; height:40px; border-radius:12px; background:#fff; border:1px solid var(--beige3); cursor:pointer; color:var(--text2); display:flex; align-items:center; justify-content:center; position:relative; transition:all .15s; box-shadow:0 1px 2px rgba(20,40,20,.05); }
 .top-notif:hover { background:var(--green3); color:var(--green); border-color:rgba(45,106,45,.25); }
@@ -698,6 +870,7 @@ tbody tr:hover td { background:var(--beige); }
   .g2, .g3 { grid-template-columns:1fr; }
   .top-date { display:none; }
   .demo-chip { display:none; }
+  .sync-chip { font-size:10.5px; padding:5px 9px; }
   .card { padding:18px; }
   .modal { padding:22px 18px; border-radius:20px; }
   .form-grid-4, .form-grid-3, .fin-row, .exoda-row { grid-template-columns:1fr !important; gap:4px !important; }
@@ -805,32 +978,40 @@ function StatCard({icon, bg, value, label, trend, up}) {
 
 // ─── LOGIN ────────────────────────────────────────────────────────────────────
 function Login({onLogin, users}) {
-  // Safe storage helpers — won't crash if localStorage unavailable (e.g. preview)
-  const safeGet = (k) => { try { return window.localStorage.getItem(k); } catch { return null; } };
-  const safeSet = (k,v) => { try { window.localStorage.setItem(k,v); } catch {} };
-  const safeDel = (k) => { try { window.localStorage.removeItem(k); } catch {} };
-
-  const [u,setU] = useState(()=>safeGet("oneiro_user")||"");
-  const [p,setP] = useState(()=>safeGet("oneiro_pass")||"");
+  // Σύνδεση: στη δοκιμαστική λειτουργία (?demo=1) γίνεται τοπικά, αλλιώς μέσω της βάσης (Supabase)
+  const [u,setU] = useState(()=>sGet("localStorage","oneiro_user")||"");
+  const [p,setP] = useState("");
   const [err,setErr] = useState("");
-  const [remember,setRemember] = useState(()=>safeGet("oneiro_remember")==="1");
+  const [busy,setBusy] = useState(false);
+  const [remember,setRemember] = useState(()=>sGet("localStorage",REMEMBER_KEY)==="1");
 
-  const go = () => {
-    const usr = users.find(x=>x.username===u&&x.password===p);
-    if(usr) {
-      setErr("");
-      if(remember){
-        safeSet("oneiro_user",u);
-        safeSet("oneiro_pass",p);
-        safeSet("oneiro_remember","1");
-      } else {
-        safeDel("oneiro_user");
-        safeDel("oneiro_pass");
-        safeDel("oneiro_remember");
-      }
-      onLogin(usr);
+  const go = async () => {
+    if(busy) return;
+    const name = u.trim();
+    if(!name || !p){ setErr("Συμπληρώστε όνομα χρήστη και κωδικό."); return; }
+    setErr("");
+    // Δεν αποθηκεύουμε ποτέ τον κωδικό σε αυτή τη συσκευή (παλιές εκδόσεις το έκαναν)
+    sDel("localStorage","oneiro_pass");
+    if(remember){ sSet("localStorage","oneiro_user",name); sSet("localStorage",REMEMBER_KEY,"1"); }
+    else { sDel("localStorage","oneiro_user"); sDel("localStorage",REMEMBER_KEY); }
+
+    if(DEMO){
+      const usr = users.find(x=>x.username===name&&x.password===p);
+      if(usr) onLogin(usr); else setErr("Λάθος στοιχεία σύνδεσης.");
+      return;
     }
-    else setErr("Λάθος στοιχεία σύνδεσης.");
+    setBusy(true);
+    try {
+      const { data, error } = await sb.auth.signInWithPassword({ email:emailOf(name), password:p });
+      if(error){
+        const offline = /fetch|network|failed/i.test(error.message||"");
+        setErr(offline ? "Δεν υπάρχει σύνδεση στο διαδίκτυο. Δοκιμάστε ξανά." : "Λάθος στοιχεία σύνδεσης.");
+        return;
+      }
+      await onLogin(data.user.id);
+    } catch(e) {
+      setErr(e.message || "Κάτι πήγε στραβά. Δοκιμάστε ξανά.");
+    } finally { setBusy(false); }
   };
   return (
     <div className="login-wrap">
@@ -841,7 +1022,7 @@ function Login({onLogin, users}) {
           <p>«Η κάθε μέρα του παιδιού δεν γυρνάει πίσω.»</p>
         </div>
         {err && <div className="lerr"><Ico n="alert" s={16}/>{err}</div>}
-        <div className="lfield"><label>Όνομα χρήστη</label><input value={u} onChange={e=>setU(e.target.value)} onKeyDown={e=>e.key==="Enter"&&go()} placeholder="username"/></div>
+        <div className="lfield"><label>Όνομα χρήστη</label><input value={u} onChange={e=>setU(e.target.value)} onKeyDown={e=>e.key==="Enter"&&go()} placeholder="username" autoCapitalize="none" autoCorrect="off" spellCheck={false}/></div>
         <div className="lfield"><label>Κωδικός</label><input type="password" value={p} onChange={e=>setP(e.target.value)} onKeyDown={e=>e.key==="Enter"&&go()} placeholder="••••••••"/></div>
         <div onClick={()=>setRemember(!remember)} style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",marginBottom:18,userSelect:"none"}}>
           <div style={{width:20,height:20,borderRadius:6,border:`2px solid ${remember?"var(--green)":"var(--beige3)"}`,background:remember?"var(--green)":"transparent",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all .15s"}}>
@@ -849,7 +1030,7 @@ function Login({onLogin, users}) {
           </div>
           <span style={{fontSize:13,fontWeight:500,color:"var(--text2)"}}>Να με θυμάσαι σε αυτή τη συσκευή</span>
         </div>
-        <button className="lbtn" onClick={go}>Σύνδεση</button>
+        <button className="lbtn" onClick={go} disabled={busy} style={busy?{opacity:.7,cursor:"wait"}:undefined}>{busy?"Σύνδεση…":"Σύνδεση"}</button>
       </div>
     </div>
   );
@@ -1036,7 +1217,7 @@ function GlobalSearch({kids, setPage, inline=false}) {
 
 
 // ─── ΔΙΑΧΕΙΡΙΣΗ ΧΡΗΣΤΩΝ (μόνο Διοίκηση) ───────────────────────────────────────
-function Xristes({users, setUsers, currentUser}) {
+function Xristes({users, setUsers, currentUser, kids=[], reloadUsers}) {
   const [search,setSearch] = useState("");
   const [roleFilter,setRoleFilter] = useState("all");
   const [showAdd,setShowAdd] = useState(false);
@@ -1044,6 +1225,9 @@ function Xristes({users, setUsers, currentUser}) {
   const [showPass,setShowPass] = useState({});
   const [confirmDel,setConfirmDel] = useState(null);
   const [showCredCard,setShowCredCard] = useState(false);
+  const [issued,setIssued] = useState({});      // κωδικοί που ορίστηκαν σε αυτή τη συνεδρία (δεν διαβάζονται ξανά από τη βάση)
+  const [newCred,setNewCred] = useState(null);
+  const [busy,setBusy] = useState(false);
 
   const emptyForm = { username:"", password:"", role:"teacher", name:"", tmima_id:"", child_id:"" };
   const [form,setForm] = useState(emptyForm);
@@ -1059,11 +1243,11 @@ function Xristes({users, setUsers, currentUser}) {
     return parts[0].charAt(0)+parts[parts.length-1].charAt(0);
   };
 
-  const genPassword = () => {
+  const genPassword = (len=10) => {
     const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
-    let pass = "";
-    for(let i=0;i<8;i++) pass += chars.charAt(Math.floor(Math.random()*chars.length));
-    return pass;
+    const arr = new Uint32Array(len);
+    try { window.crypto.getRandomValues(arr); } catch { for(let i=0;i<len;i++) arr[i]=Math.floor(Math.random()*4294967295); }
+    return Array.from(arr, n=>chars[n%chars.length]).join("");
   };
 
   const filt = users.filter(u=>{
@@ -1074,41 +1258,83 @@ function Xristes({users, setUsers, currentUser}) {
   });
 
   const openAdd = () => { setForm({...emptyForm, password:genPassword()}); setEditUser(null); setShowAdd(true); };
-  const openEdit = (u) => { setForm({username:u.username, password:u.password, role:u.role, name:u.name, tmima_id:u.tmima_id||"", child_id:u.child_id||""}); setEditUser(u); setShowAdd(true); };
+  const openEdit = (u) => { setForm({username:u.username, password:u.password||"", role:u.role, name:u.name, tmima_id:u.tmima_id||"", child_id:u.child_id||""}); setEditUser(u); setShowAdd(true); };
 
-  const saveUser = () => {
-    if(!form.username.trim()||!form.password.trim()||!form.name.trim()){
+  const saveUser = async () => {
+    if(busy) return;
+    const needPass = DEMO || !editUser;
+    if(!form.username.trim()||!form.name.trim()||(needPass&&!form.password.trim())){
       alert("Συμπληρώστε όνομα χρήστη, κωδικό και ονοματεπώνυμο.");
       return;
     }
-    // Check username uniqueness (except when editing same user)
-    const dup = users.find(u=>u.username===form.username && (!editUser||u.id!==editUser.id));
+    const uname = form.username.trim().toLowerCase();
+    const dup = users.find(u=>u.username.toLowerCase()===uname && (!editUser||u.id!==editUser.id));
     if(dup){ alert("Αυτό το όνομα χρήστη υπάρχει ήδη. Επιλέξτε άλλο."); return; }
-
     const tmimaObj = TMIMATA.find(t=>t.id===form.tmima_id);
-    const payload = {
-      username: form.username.trim(),
-      password: form.password,
-      role: form.role,
-      name: form.name.trim(),
-      initials: mkInitials(form.name),
-      ...(form.role==="teacher" ? { tmima_id: form.tmima_id, tmima: tmimaObj?.name||"" } : {}),
-      ...(form.role==="parent" ? { child_id: form.child_id?Number(form.child_id):undefined } : {}),
-    };
 
-    if(editUser){
-      setUsers(users.map(u=>u.id===editUser.id?{...u,...payload}:u));
-    } else {
-      const newId = Math.max(0,...users.map(u=>u.id))+1;
-      setUsers([...users, {id:newId, ...payload}]);
+    if(DEMO){
+      const payload = {
+        username: form.username.trim(), password: form.password, role: form.role, name: form.name.trim(), initials: mkInitials(form.name),
+        ...(form.role==="teacher" ? { tmima_id: form.tmima_id, tmima: tmimaObj?.name||"" } : {}),
+        ...(form.role==="parent" ? { child_id: form.child_id?Number(form.child_id):undefined } : {}),
+      };
+      if(editUser) setUsers(users.map(u=>u.id===editUser.id?{...u,...payload}:u));
+      else setUsers([...users, {id:Math.max(0,...users.map(u=>u.id))+1, ...payload}]);
+      setShowAdd(false); setEditUser(null); setForm(emptyForm);
+      return;
     }
-    setShowAdd(false); setEditUser(null); setForm(emptyForm);
+    if(!/^[a-z0-9._-]{3,32}$/.test(uname)){ alert("Το όνομα χρήστη: μόνο λατινικά γράμματα, αριθμοί, τελεία ή παύλα (3–32 χαρακτήρες)."); return; }
+    if(form.password && form.password.length<8){ alert("Ο κωδικός πρέπει να έχει τουλάχιστον 8 χαρακτήρες."); return; }
+    if(form.role==="teacher" && !form.tmima_id){ alert("Επιλέξτε τμήμα για τη δασκάλα."); return; }
+    if(form.role==="parent" && !form.child_id){ alert("Επιλέξτε το παιδί του γονέα."); return; }
+    const payload = {
+      username:uname, role:form.role, name:form.name.trim(), initials:mkInitials(form.name),
+      tmima_id: form.role==="teacher" ? form.tmima_id : null,
+      child_id: form.role==="parent" ? Number(form.child_id) : null,
+      ...(form.password ? { password:form.password } : {}),
+    };
+    setBusy(true);
+    try {
+      if(editUser){
+        await sbAdmin("update", { id:editUser.id, ...payload });
+        if(form.password) setIssued(p=>({...p,[editUser.id]:form.password}));
+      } else {
+        const r = await sbAdmin("create", payload);
+        if(r?.id) setIssued(p=>({...p,[r.id]:form.password}));
+      }
+      if(form.password) setNewCred({ name:payload.name, username:uname, password:form.password });
+      await reloadUsers();
+      setShowAdd(false); setEditUser(null); setForm(emptyForm);
+    } catch(e) { alert("⚠️ "+e.message); }
+    finally { setBusy(false); }
   };
 
-  const deleteUser = (u) => {
+  const deleteUser = async (u) => {
     if(u.id===currentUser.id){ alert("Δεν μπορείτε να διαγράψετε τον δικό σας λογαριασμό."); return; }
-    setUsers(users.filter(x=>x.id!==u.id));
-    setConfirmDel(null);
+    if(DEMO){ setUsers(users.filter(x=>x.id!==u.id)); setConfirmDel(null); return; }
+    setBusy(true);
+    try { await sbAdmin("delete",{ id:u.id }); await reloadUsers(); setConfirmDel(null); }
+    catch(e){ alert("⚠️ "+e.message); }
+    finally { setBusy(false); }
+  };
+
+  // Δημιουργία των προτεινόμενων λογαριασμών προσωπικού με τυχαίους κωδικούς
+  const missingStaff = DEFAULT_STAFF.filter(d=>!users.some(u=>u.username.toLowerCase()===d.username));
+  const createDefaultStaff = async () => {
+    if(busy) return;
+    if(!window.confirm(`Θα δημιουργηθούν ${missingStaff.length} λογαριασμοί προσωπικού (Γραμματεία και δασκάλες) με τυχαίους κωδικούς.\\nΟι κωδικοί θα εμφανιστούν ΜΙΑ φορά — θα πρέπει να τους σημειώσετε. Συνέχεια;`)) return;
+    setBusy(true);
+    const got = {}; const failed = [];
+    for(const d of missingStaff){
+      const pw = genPassword(10);
+      try { const r = await sbAdmin("create", { ...d, password:pw }); if(r?.id) got[r.id]=pw; }
+      catch(e){ failed.push(`${d.username}: ${e.message}`); }
+    }
+    setIssued(p=>({...p,...got}));
+    try { await reloadUsers(); } catch {}
+    setBusy(false);
+    if(failed.length) alert("Δεν δημιουργήθηκαν:\\n"+failed.join("\\n"));
+    else setShowCredCard(true);
   };
 
   const togglePass = (id) => setShowPass(p=>({...p,[id]:!p[id]}));
@@ -1150,10 +1376,33 @@ function Xristes({users, setUsers, currentUser}) {
       <div style={{background:"#FFF8E7",border:"1.5px solid #F5B800",borderRadius:12,padding:"12px 15px",marginBottom:16,display:"flex",gap:10,alignItems:"flex-start"}}>
         <span style={{fontSize:18,flexShrink:0}}>⚠️</span>
         <div style={{fontSize:12,color:"#78350F",lineHeight:1.6}}>
-          Οι κωδικοί εδώ αποθηκεύονται προσωρινά στη συνεδρία (session) — <strong>χάνονται όταν κλείσετε τη σελίδα</strong>.
-          Για μόνιμη & ασφαλή αποθήκευση χρειάζεται σύνδεση με βάση δεδομένων.
+          {DEMO
+            ? <>Δοκιμαστική λειτουργία — οι αλλαγές <strong>χάνονται όταν κλείσετε τη σελίδα</strong>.</>
+            : <>Οι κωδικοί αποθηκεύονται <strong>κρυπτογραφημένα</strong> και δεν μπορούν να ξαναδιαβαστούν — εμφανίζονται μόνο τη στιγμή που τους ορίζετε. Σημειώστε τους και δώστε τους στο άτομο. Για νέο κωδικό πατήστε «Επεξεργασία».</>}
         </div>
       </div>
+
+      {!DEMO && missingStaff.length>0 && (
+        <div style={{background:"var(--green3)",border:"1.5px solid rgba(45,106,45,.25)",borderRadius:12,padding:"14px 16px",marginBottom:16,display:"flex",gap:14,alignItems:"center",flexWrap:"wrap"}}>
+          <div style={{flex:1,minWidth:220,fontSize:13,color:"var(--green)",lineHeight:1.5}}>
+            <strong>Λογαριασμοί προσωπικού:</strong> λείπουν {missingStaff.length} (Γραμματεία και δασκάλες). Πατήστε το κουμπί για να δημιουργηθούν αυτόματα με ασφαλείς κωδικούς.
+          </div>
+          <button className="btn btn-primary" onClick={createDefaultStaff} disabled={busy}>{busy?"Δημιουργία…":"Δημιουργία λογαριασμών προσωπικού"}</button>
+        </div>
+      )}
+
+      {newCred && (
+        <div className="modal-bg" onClick={e=>e.target===e.currentTarget&&setNewCred(null)}>
+          <div className="modal" style={{maxWidth:440}}>
+            <div className="modal-title">✅ Ο λογαριασμός αποθηκεύτηκε <button className="modal-close" onClick={()=>setNewCred(null)}>✕</button></div>
+            <div style={{fontSize:13,color:"var(--text2)",marginBottom:14,lineHeight:1.5}}>Σημειώστε τα στοιχεία και δώστε τα στον/στην <strong>{newCred.name}</strong>. Ο κωδικός δεν εμφανίζεται ξανά.</div>
+            <div style={{background:"var(--beige)",borderRadius:12,padding:"14px 16px",fontFamily:"monospace",fontSize:14,lineHeight:1.9}}>
+              Όνομα χρήστη: <strong>{newCred.username}</strong><br/>Κωδικός: <strong>{newCred.password}</strong>
+            </div>
+            <button className="btn btn-primary" style={{width:"100%",marginTop:16,justifyContent:"center"}} onClick={()=>setNewCred(null)}>Το σημείωσα</button>
+          </div>
+        </div>
+      )}
 
       {/* ΚΑΡΤΑ ΣΤΟΙΧΕΙΩΝ ΠΡΟΣΩΠΙΚΟΥ — για εκτύπωση/παράδοση */}
       {showCredCard && (
@@ -1165,7 +1414,7 @@ function Xristes({users, setUsers, currentUser}) {
             </div>
             <div style={{fontSize:12,color:"var(--text3)",marginBottom:16}}>
               Δώστε προσωπικά σε κάθε άτομο τη γραμμή που του αντιστοιχεί. Δεν περιλαμβάνονται γονείς —
-              οι λογαριασμοί τους δημιουργούνται από το Μητρώο.
+              οι λογαριασμοί τους δημιουργούνται από το Μητρώο. Εμφανίζονται μόνο οι κωδικοί που ορίστηκαν σε αυτή τη συνεδρία.
             </div>
 
             <div id="cred-card-print" style={{border:"1px solid var(--beige3)",borderRadius:12,overflow:"hidden"}}>
@@ -1188,7 +1437,7 @@ function Xristes({users, setUsers, currentUser}) {
                   </div>
                   <div>
                     <div style={{fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".04em"}}>Κωδικός</div>
-                    <div style={{fontFamily:"monospace",fontWeight:700,fontSize:13,color:"var(--burg)"}}>{u.password}</div>
+                    <div style={{fontFamily:"monospace",fontWeight:700,fontSize:13,color:"var(--burg)"}}>{u.password ?? issued[u.id] ?? "—"}</div>
                   </div>
                 </div>
               ))}
@@ -1221,19 +1470,21 @@ function Xristes({users, setUsers, currentUser}) {
               </div>
               <div style={{fontSize:12,color:"var(--text3)",marginTop:3,display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}>
                 <span><Ico n="user" s={16}/>{u.username}</span>
-                <span style={{display:"flex",alignItems:"center",gap:5}}>
-                  🔑 {showPass[u.id] ? u.password : "••••••••"}
-                  <button onClick={()=>togglePass(u.id)} style={{background:"none",border:"none",cursor:"pointer",fontSize:11,color:"var(--green)",fontWeight:600,padding:0}}>
-                    {showPass[u.id]?"Απόκρυψη":"Εμφάνιση"}
-                  </button>
-                </span>
+                {(u.password ?? issued[u.id]) ? (
+                  <span style={{display:"flex",alignItems:"center",gap:5}}>
+                    🔑 {showPass[u.id] ? (u.password ?? issued[u.id]) : "••••••••"}
+                    <button onClick={()=>togglePass(u.id)} style={{background:"none",border:"none",cursor:"pointer",fontSize:11,color:"var(--green)",fontWeight:600,padding:0}}>
+                      {showPass[u.id]?"Απόκρυψη":"Εμφάνιση"}
+                    </button>
+                  </span>
+                ) : <span>🔑 κρυπτογραφημένος</span>}
               </div>
             </div>
             <div style={{display:"flex",gap:6,flexShrink:0}}>
               <button className="btn btn-ghost btn-xs" onClick={()=>openEdit(u)}>✏️ Επεξεργασία</button>
               {confirmDel===u.id ? (
                 <>
-                  <button className="btn btn-xs" style={{background:"#CC2929",color:"#fff",border:"none"}} onClick={()=>deleteUser(u)}>Επιβεβαίωση</button>
+                  <button className="btn btn-xs" disabled={busy} style={{background:"#CC2929",color:"#fff",border:"none"}} onClick={()=>deleteUser(u)}>Επιβεβαίωση</button>
                   <button className="btn btn-ghost btn-xs" onClick={()=>setConfirmDel(null)}>Άκυρο</button>
                 </>
               ) : (
@@ -1273,12 +1524,12 @@ function Xristes({users, setUsers, currentUser}) {
             <div className="f2">
               <div className="fgroup">
                 <label className="flabel">Όνομα χρήστη (username) *</label>
-                <input className="finput" value={form.username} onChange={e=>f("username",e.target.value.toLowerCase().replace(/\s/g,""))} placeholder="π.χ. katerina"/>
+                <input className="finput" value={form.username} onChange={e=>f("username",e.target.value.toLowerCase().replace(/\s/g,""))} placeholder="π.χ. katerina" autoCapitalize="none" disabled={!!editUser&&!DEMO}/>
               </div>
               <div className="fgroup">
-                <label className="flabel">Κωδικός πρόσβασης *</label>
+                <label className="flabel">{(editUser&&!DEMO)?"Νέος κωδικός (κενό = να μείνει ο ίδιος)":"Κωδικός πρόσβασης *"}</label>
                 <div style={{display:"flex",gap:6}}>
-                  <input className="finput" value={form.password} onChange={e=>f("password",e.target.value)} placeholder="Κωδικός"/>
+                  <input className="finput" value={form.password} onChange={e=>f("password",e.target.value)} placeholder={(editUser&&!DEMO)?"Αφήστε κενό αν δεν αλλάζει":"Κωδικός"}/>
                   <button className="btn btn-ghost btn-sm" style={{flexShrink:0}} onClick={()=>f("password",genPassword())} title="Δημιουργία τυχαίου κωδικού">🎲</button>
                 </div>
               </div>
@@ -1296,14 +1547,16 @@ function Xristes({users, setUsers, currentUser}) {
 
             {form.role==="parent" && (
               <div className="fgroup">
-                <label className="flabel">ID Παιδιού (από το Μητρώο)</label>
-                <input className="finput" type="number" value={form.child_id} onChange={e=>f("child_id",e.target.value)} placeholder="π.χ. 3"/>
-                <div style={{fontSize:11,color:"var(--text3)",marginTop:4}}>Βρείτε το ID του παιδιού ανοίγοντας την καρτέλα του στο Μητρώο.</div>
+                <label className="flabel">Παιδί</label>
+                <select className="finput" value={form.child_id} onChange={e=>f("child_id",e.target.value)}>
+                  <option value="">Επιλέξτε παιδί...</option>
+                  {[...kids].sort((a,b)=>a.name.localeCompare(b.name,"el")).map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
               </div>
             )}
 
             <div style={{display:"flex",gap:10,marginTop:6}}>
-              <button className="btn btn-primary" style={{flex:1}} onClick={saveUser}>💾 Αποθήκευση</button>
+              <button className="btn btn-primary" style={{flex:1}} onClick={saveUser} disabled={busy}>{busy?"Αποθήκευση…":"💾 Αποθήκευση"}</button>
               <button className="btn btn-ghost" onClick={()=>setShowAdd(false)}>Ακύρωση</button>
             </div>
           </div>
@@ -1567,7 +1820,7 @@ function ParastatikoPar({label, icon, color, colorLight, user, selId, subcats, s
 }
 
 // ─── ΠΑΙΔΙΑ & ΦΑΚΕΛΟΙ ───────────────────────────────────────────────────────
-function Paidia({user, kids, setKids}) {
+function Paidia({user, kids, setKids, onCreateParent}) {
   const [search,setSearch] = useState("");
   const [ft,setFt] = useState("all");
   const [showAdd,setShowAdd] = useState(false);
@@ -1626,15 +1879,34 @@ function Paidia({user, kids, setKids}) {
       && (ft==="all"||c.tmima===ft);
   }).sort((a,b)=>getSurname(a.name).localeCompare(getSurname(b.name),"el"));
 
-  const saveKid = () => {
+  const saveKid = async () => {
     const t = TMIMATA.find(t=>t.id===form.tmima);
+    const wantParent = !DEMO && !form.parent_account && form.parent_username.trim() && form.parent_password;
+    if(wantParent){
+      if(!/^[a-z0-9._-]{3,32}$/.test(form.parent_username.trim().toLowerCase())){ alert("Το όνομα χρήστη γονέα: μόνο λατινικά γράμματα, αριθμοί, τελεία ή παύλα (3–32 χαρακτήρες)."); return; }
+      if(form.parent_password.length<8){ alert("Ο κωδικός του γονέα πρέπει να έχει τουλάχιστον 8 χαρακτήρες."); return; }
+    }
+    const amount = t?.type==="vrefiko"?350:280;
+    let kidId;
     if(editMode && sel){
-      setKids(kids.map(c=>c.id===sel.id?{...c,...form,amount:t?.type==="vrefiko"?350:280}:c));
+      kidId = sel.id;
+      setKids(kids.map(c=>c.id===sel.id?{...c,...form,amount}:c));
       setSel({...sel,...form});
     } else {
-      setKids([...kids,{...form, id:Date.now(), amount:t?.type==="vrefiko"?350:280}]);
+      kidId = Date.now();
+      setKids([...kids,{...form, id:kidId, amount}]);
     }
+    const pwd = form.parent_password, uname = form.parent_username.trim().toLowerCase(), pname = form.mit_name||form.pat_name||"Γονέας";
     setShowAdd(false); setAddStep(1); setForm(emptyForm); setEditMode(false);
+    if(wantParent){
+      try {
+        await onCreateParent({ username:uname, password:pwd, name:pname, child_id:kidId });
+        setKids(prev=>prev.map(c=>c.id===kidId?{...c,parent_username:uname,parent_account:true,parent_password:""}:c));
+        alert(`✅ Δημιουργήθηκε λογαριασμός γονέα.\n\nΌνομα χρήστη: ${uname}\nΚωδικός: ${pwd}\n\nΣημειώστε τα και δώστε τα στον γονέα — ο κωδικός δεν εμφανίζεται ξανά.`);
+      } catch(e) {
+        alert("⚠️ Το παιδί αποθηκεύτηκε, αλλά ο λογαριασμός γονέα ΔΕΝ δημιουργήθηκε:\n"+e.message+"\n\nΜπορείτε να τον φτιάξετε από «Χρήστες».");
+      }
+    }
   };
 
   const openEditKid = () => {
@@ -1950,16 +2222,22 @@ function Paidia({user, kids, setKids}) {
                 </div>
 
                 <div className="section-hd"><Ico n="key" s={16}/>Portal Γονέα (Πρόσβαση στην εφαρμογή)</div>
+                {form.parent_account ? (
+                  <div style={{background:"#ECFDF5",border:"1px solid #A7F3D0",borderRadius:10,padding:"12px 14px",fontSize:13,color:"#065F46",marginBottom:10}}>
+                    ✅ Ο γονέας έχει λογαριασμό (<strong>{form.parent_username}</strong>). Για νέο κωδικό πηγαίνετε στη σελίδα <strong>Χρήστες</strong>.
+                  </div>
+                ) : (
                 <div className="f2">
                   <div className="fgroup">
                     <label className="flabel">Username γονέα</label>
-                    <input className="finput" value={form.parent_username} onChange={e=>f("parent_username",e.target.value)} placeholder="π.χ. papadopoulos2026"/>
+                    <input className="finput" value={form.parent_username} onChange={e=>f("parent_username",e.target.value.toLowerCase().replace(/\s/g,""))} placeholder="π.χ. papadopoulos2026" autoCapitalize="none"/>
                   </div>
                   <div className="fgroup">
                     <label className="flabel">Κωδικός πρόσβασης</label>
-                    <input className="finput" type="password" value={form.parent_password} onChange={e=>f("parent_password",e.target.value)} placeholder="Τουλάχιστον 8 χαρακτήρες"/>
+                    <input className="finput" type="text" value={form.parent_password} onChange={e=>f("parent_password",e.target.value)} placeholder="Τουλάχιστον 8 χαρακτήρες"/>
                   </div>
                 </div>
+                )}
                 <div style={{background:"var(--green3)",borderRadius:10,padding:"10px 14px",fontSize:12,color:"var(--green)",fontWeight:500}}>
                   ℹ️ Ο γονέας θα χρησιμοποιεί αυτά τα στοιχεία για να συνδεθεί στην εφαρμογή και να βλέπει το ημερήσιο δελτίο του παιδιού.
                 </div>
@@ -2968,7 +3246,7 @@ function Epikoinonia({user, onNewParentMsg}) {
                   {m.to_teacher&&<span className="badge b-gray" style={{fontSize:10}}>➡️ {m.to_teacher}</span>}
                   {!m.read&&<span className="badge b-red" style={{fontSize:10}}>Μη αναγνωσμένο</span>}
                   <button className="btn btn-ghost btn-xs" style={{marginLeft:"auto"}}
-                    onClick={()=>{PT_MESSAGES.list=PT_MESSAGES.list.map(x=>x.id===m.id?{...x,read:true}:x);setPtMsgs([...PT_MESSAGES.list]);}}>
+                    onClick={()=>PT_MESSAGES.markRead(m.id)}>
                     {m.read?"✓ Διαβάστηκε":"Σήμανση ως διαβασμένο"}
                   </button>
                   <button className="btn btn-primary btn-xs" onClick={()=>{setReplyTo(m);setReplyText("");}}>↩️ Απάντηση</button>
@@ -3061,6 +3339,10 @@ function ParentPortal({user, kids}) {
   const child = kids.find(c=>c.id===user.child_id);
   const [tab,setTab] = useState("deltion");
   const [msg,setMsg] = useState(""), [sent,setSent] = useState([]);
+  // Η συνομιλία του γονέα: τα δικά του μηνύματα και οι απαντήσεις του προσωπικού (αποθηκεύονται στη βάση)
+  const [ptm,setPtm] = useState(PT_MESSAGES.list);
+  useEffect(()=>PT_MESSAGES.subscribe(()=>setPtm([...PT_MESSAGES.list])),[]);
+  const conv = ptm.filter(m=>child && Number(m.child_id)===Number(child.id)).slice().reverse();
   if(!child) return (
     <div className="page-in">
       <div className="card" style={{maxWidth:480,margin:"60px auto",textAlign:"center",padding:32}}>
@@ -3465,8 +3747,8 @@ function ParentPortal({user, kids}) {
           <div>
             <div className="card" style={{marginBottom:12}}>
               <div style={{fontFamily:"Playfair Display,serif",fontWeight:600,fontSize:14,marginBottom:12}}>Τα μηνύματά μου</div>
-              {sent.length===0?<div style={{textAlign:"center",color:"var(--text3)",fontSize:13,padding:"20px 0"}}>Δεν έχετε στείλει μηνύματα ακόμα</div>:
-                sent.map((m,i)=><div key={i} style={{background:"var(--green3)",borderRadius:12,padding:"10px 13px",marginBottom:8}}><div style={{fontWeight:500,fontSize:13}}>{m.text}</div><div style={{fontSize:11,color:"var(--text3)",marginTop:3}}>{m.date} {m.time}</div></div>)
+              {conv.length===0?<div style={{textAlign:"center",color:"var(--text3)",fontSize:13,padding:"20px 0"}}>Δεν υπάρχουν μηνύματα ακόμα</div>:
+                conv.map((m,i)=>{ const mine=m.from_role==="parent"; return <div key={m.id||i} style={{background:mine?"var(--green3)":"var(--beige2)",borderRadius:12,padding:"10px 13px",marginBottom:8,marginLeft:mine?24:0,marginRight:mine?0:24}}><div style={{fontSize:11,fontWeight:700,color:mine?"var(--green)":"var(--text2)",marginBottom:3}}>{mine?"Εσείς":m.from_name}</div><div style={{fontWeight:500,fontSize:13}}>{m.text}</div><div style={{fontSize:11,color:"var(--text3)",marginTop:3}}>{m.date} {m.time}</div></div>; })
               }
             </div>
             <div style={{background:"var(--beige2)",borderRadius:12,padding:16}}>
@@ -3911,9 +4193,19 @@ export default function App() {
       document.title = "Ονειροχώρα — Διαχείριση";
     } catch(e){}
   }, []);
-  const [kids,setKids] = useState(KIDS0);
-  const [users,setUsers] = useState(USERS);
-  // Οι γονείς που καταχωρήθηκαν στο Μητρώο (με όνομα χρήστη/κωδικό) μπορούν να συνδεθούν
+  const [booting,setBooting] = useState(!DEMO);
+  const [users,setUsers] = useState(DEMO?DEMO_USERS:[]);
+  const [kids,setKidsState] = useState(KIDS0);
+  const kidsRef = useRef(KIDS0);
+  const snapRef = useRef(new Map());
+  const roleRef = useRef(null);
+  const uidRef = useRef(null);
+  const flushTimer = useRef(null), reloadTimer = useRef(null);
+  const flushing = useRef(false), dirty = useRef(false);
+  const [syncState,setSyncState] = useState("idle");   // idle | saving | saved | error
+  const [syncErr,setSyncErr] = useState("");
+
+  // Δοκιμαστική λειτουργία: οι γονείς του Μητρώου μπορούν να συνδεθούν τοπικά
   const allUsers = [
     ...users,
     ...kids.filter(k=>k.parent_username && k.parent_password && !users.some(u=>u.username===k.parent_username)).map(k=>{
@@ -3921,6 +4213,111 @@ export default function App() {
       return { id:"kid-"+k.id, username:k.parent_username, password:k.parent_password, role:"parent", name:nm, initials:nm.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase(), child_id:k.id };
     }),
   ];
+
+  // ΑΠΟΘΗΚΕΥΣΗ: κάθε αλλαγή στα παιδιά πηγαίνει αυτόματα στη βάση (μετά από ~0,5″)
+  const runFlush = async () => {
+    if(!sb || !roleRef.current || roleRef.current==="parent") return;
+    if(flushing.current){ dirty.current = true; return; }
+    flushing.current = true; dirty.current = false;
+    setSyncState("saving");
+    try {
+      await sbFlushKids(kidsRef.current, snapRef.current, roleRef.current);
+      setSyncErr("");
+      setSyncState(dirty.current ? "saving" : "saved");
+      if(!dirty.current) setTimeout(()=>setSyncState(x=>x==="saved"?"idle":x), 2500);
+    } catch(e) {
+      setSyncErr(e.message||String(e)); setSyncState("error");
+    } finally {
+      flushing.current = false;
+      if(dirty.current){ clearTimeout(flushTimer.current); flushTimer.current = setTimeout(runFlush, 300); }
+    }
+  };
+  const setKids = (next) => {
+    const val = typeof next==="function" ? next(kidsRef.current) : next;
+    kidsRef.current = val; setKidsState(val);
+    if(sb && roleRef.current && roleRef.current!=="parent"){
+      dirty.current = true; setSyncState("saving");
+      clearTimeout(flushTimer.current); flushTimer.current = setTimeout(runFlush, 500);
+    }
+  };
+  const reloadKids = async () => {
+    if(!sb || !roleRef.current || flushing.current || dirty.current) return;
+    try {
+      const r = await sbLoadKids(roleRef.current);
+      if(flushing.current || dirty.current) return;
+      kidsRef.current = r.kids; snapRef.current = r.snap; setKidsState(r.kids);
+    } catch(e) { console.error(e); }
+  };
+  const scheduleReload = () => { clearTimeout(reloadTimer.current); reloadTimer.current = setTimeout(reloadKids, 700); };
+  const reloadUsers = async () => {
+    if(!sb) return;
+    const { data, error } = await sb.from("profiles").select("*").order("created_at");
+    if(error) throw error;
+    setUsers(data.map(toUser));
+  };
+
+  // Είσοδος μετά από επιτυχή σύνδεση: φορτώνει προφίλ, παιδιά, μηνύματα
+  const enter = async (uid) => {
+    const { data:p, error } = await sb.from("profiles").select("*").eq("id",uid).maybeSingle();
+    if(error || !p){
+      await sb.auth.signOut();
+      throw new Error("Ο λογαριασμός δεν έχει ακόμα δικαιώματα πρόσβασης. Επικοινωνήστε με τη Διοίκηση.");
+    }
+    const u = toUser(p);
+    roleRef.current = u.role; uidRef.current = u.id;
+    const [kr, msgsRes, profs] = await Promise.all([
+      sbLoadKids(u.role),
+      sb.from("pt_messages").select("*").order("created_at",{ascending:false}).limit(300),
+      u.role==="admin" ? sb.from("profiles").select("*").order("created_at") : Promise.resolve({ data:[] }),
+    ]);
+    if(msgsRes.error) throw msgsRes.error;
+    kidsRef.current = kr.kids; snapRef.current = kr.snap; setKidsState(kr.kids);
+    PT_MESSAGES.setAll(msgsRes.data||[]);
+    setUsers((profs.data||[]).map(toUser));
+    setUser(u);
+    setPage(u.role==="parent"?"parent_portal":"dashboard");
+  };
+  const resetSession = () => {
+    roleRef.current = null; uidRef.current = null;
+    clearTimeout(flushTimer.current); clearTimeout(reloadTimer.current);
+    dirty.current = false; flushing.current = false;
+    kidsRef.current = []; snapRef.current = new Map(); setKidsState([]);
+    PT_MESSAGES.setAll([]); setUsers([]); setUser(null); setPage("dashboard"); setSyncState("idle");
+  };
+
+  // Εκκίνηση: αν υπάρχει ήδη συνδεδεμένη συνεδρία, μπαίνουμε κατευθείαν
+  useEffect(()=>{
+    if(DEMO) return;
+    let alive = true;
+    sb.auth.getSession()
+      .then(async ({ data })=>{ if(data.session && alive){ try { await enter(data.session.user.id); } catch(e){ console.error(e); } } })
+      .catch(()=>{})
+      .finally(()=>{ if(alive) setBooting(false); });
+    const { data:sub } = sb.auth.onAuthStateChange((ev)=>{ if(ev==="SIGNED_OUT" && alive && roleRef.current) resetSession(); });
+    return ()=>{ alive=false; sub.subscription.unsubscribe(); };
+  },[]);
+
+  // Ζωντανή ενημέρωση: αλλαγές από άλλους χρήστες εμφανίζονται χωρίς ανανέωση σελίδας
+  useEffect(()=>{
+    if(DEMO || !user) return;
+    const ch = sb.channel("oneiro-live")
+      .on("postgres_changes",{ event:"INSERT", schema:"public", table:"pt_messages" }, pl=>PT_MESSAGES.receive(pl.new, uidRef.current))
+      .on("postgres_changes",{ event:"UPDATE", schema:"public", table:"pt_messages" }, pl=>PT_MESSAGES.receiveUpdate(pl.new))
+      .on("postgres_changes",{ event:"*", schema:"public", table:"kids" }, scheduleReload)
+      .on("postgres_changes",{ event:"*", schema:"public", table:"daily_reports" }, scheduleReload)
+      .subscribe();
+    const onVis = () => { if(document.visibilityState==="visible") scheduleReload(); };
+    document.addEventListener("visibilitychange", onVis);
+    return ()=>{ document.removeEventListener("visibilitychange", onVis); sb.removeChannel(ch); };
+  },[user&&user.id]);
+
+  // Προειδοποίηση αν κλείσει η σελίδα ενώ κάτι δεν έχει αποθηκευτεί ακόμα
+  useEffect(()=>{
+    const h = (e) => { if(dirty.current || flushing.current || syncState==="error"){ e.preventDefault(); e.returnValue=""; } };
+    window.addEventListener("beforeunload", h);
+    return ()=>window.removeEventListener("beforeunload", h);
+  },[syncState]);
+
   const [pushNotifs, setPushNotifs] = useState([]);
   const [showNotifPanel, setShowNotifPanel] = useState(false);
   const [ptMsgsForPanel, setPtMsgsForPanel] = useState(PT_MESSAGES.list);
@@ -3953,10 +4350,10 @@ export default function App() {
     if(!user) return;
     if(!(user.role==="admin"||user.role==="secretary"||user.role==="teacher")) return;
     let initial = true;
-    const unsub = PT_MESSAGES.subscribe(()=>{
+    const unsub = PT_MESSAGES.subscribe((evt)=>{
       if(initial) return;
-      const latest = PT_MESSAGES.list[0];
-      if(!latest) return;
+      if(!evt || evt.type!=="new" || !evt.msg || evt.msg.from_role!=="parent") return;
+      const latest = evt.msg;
       const myTmima = user.tmima_id || user.tmima;
       const forMe = user.role==="admin"||user.role==="secretary"
         || (user.role==="teacher" && (latest.tmima===myTmima || latest.to_teacher===user.name));
@@ -3969,12 +4366,25 @@ export default function App() {
     return unsub;
   },[user]);
 
-  const logout = () => { setUser(null); setPage("dashboard"); };
+  const logout = async () => {
+    if(sb){
+      if(dirty.current || flushing.current){ try { await runFlush(); } catch {} }
+      try { await sb.auth.signOut(); } catch {}
+      resetSession();
+    } else { setUser(null); setPage("dashboard"); }
+  };
+
+  if(booting) return (
+    <>
+      <style>{CSS}</style>
+      <div className="boot"><div className="boot-spin"/><div>Φόρτωση…</div></div>
+    </>
+  );
 
   if(!user) return (
     <>
       <style>{CSS}</style>
-      <Login users={allUsers} onLogin={u=>{ setUser(u); setPage(u.role==="parent"?"parent_portal":"dashboard"); }}/>
+      <Login users={allUsers} onLogin={DEMO ? (u=>{ setUser(u); setPage(u.role==="parent"?"parent_portal":"dashboard"); }) : enter}/>
     </>
   );
 
@@ -4077,6 +4487,11 @@ export default function App() {
               </div>
             </div>
             <div className="topbar-r">
+              {!DEMO && syncState!=="idle" && (
+                <span className={`sync-chip sync-${syncState}`} onClick={syncState==="error"?runFlush:undefined} title={syncState==="error"?("Πατήστε για νέα προσπάθεια. "+syncErr):""}>
+                  {syncState==="saving"?"Αποθηκεύεται…":syncState==="saved"?"✓ Αποθηκεύτηκε":"⚠ Δεν αποθηκεύτηκε — πατήστε"}
+                </span>
+              )}
               {DEMO && <span className="demo-chip" title="Δοκιμαστικά δεδομένα — δεν είναι πραγματικά παιδιά">ΔΟΚΙΜΑΣΤΙΚΑ</span>}
               <GlobalSearch kids={kids} setPage={setPage}/>
               <span className="top-date"><Ico n="calendar" s={14}/>{new Date().toLocaleDateString("el-GR")}</span>
@@ -4132,7 +4547,7 @@ export default function App() {
           </div>
           <div className="content">
             {page==="dashboard"   && <Dashboard   user={user} kids={kids} setPage={setPage}/>}
-            {page==="mitroo"      && <Paidia      user={user} kids={kids} setKids={setKids}/>}
+            {page==="mitroo"      && <Paidia      user={user} kids={kids} setKids={setKids} onCreateParent={DEMO ? (async()=>{}) : (d=>sbAdmin("create",{ ...d, role:"parent", initials:(d.name||"?").split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase() }))}/>}
             {page==="parousies"   && <Parousies   user={user} kids={kids} setKids={setKids}/>}
             {page==="deltion"     && <Deltion     user={user} kids={kids} setKids={setKids}/>}
             {page==="gallery"     && <Gallery     user={user}/>}
@@ -4142,7 +4557,7 @@ export default function App() {
             {page==="oikonomika"  && <Oikonomika  user={user} kids={kids} setKids={setKids}/>}
             {page==="programma"   && <Programma/>}
             {page==="anafores"    && <Anafores    kids={kids}/>}
-            {page==="xristes"     && <Xristes     users={users} setUsers={setUsers} currentUser={user}/>}
+            {page==="xristes"     && <Xristes     users={users} setUsers={setUsers} currentUser={user} kids={kids} reloadUsers={reloadUsers}/>}
           </div>
         </div>
       </div>
