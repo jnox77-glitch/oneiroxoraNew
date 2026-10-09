@@ -29,7 +29,78 @@ const todayGR = new Date().toLocaleDateString("el-GR",{weekday:"long",day:"numer
 // Τα παιδιά προστίθενται από το Μητρώο (κενό μέχρι να καταχωρηθούν πραγματικά)
 const genKids = () => [];
 
-const KIDS0 = genKids();
+// ─── ΔΟΚΙΜΑΣΤΙΚΑ ΔΕΔΟΜΕΝΑ (εμφανίζονται ΜΟΝΟ αν η διεύθυνση τελειώνει σε ?demo=1) ───
+const DEMO = (()=>{ try { return /[?&]demo=1/.test(window.location.search); } catch { return false; } })();
+function genDemoKids(){
+  let seed = 20261009;
+  const rnd = () => { seed = (seed*1664525 + 1013904223) % 4294967296; return seed/4294967296; };
+  const pick = a => a[Math.floor(rnd()*a.length)];
+  const shuffle = a => { const b=[...a]; for(let i=b.length-1;i>0;i--){ const j=Math.floor(rnd()*(i+1)); [b[i],b[j]]=[b[j],b[i]]; } return b; };
+  const boys=["Γιώργος","Νίκος","Δημήτρης","Κώστας","Αλέξανδρος","Μάριος","Θανάσης","Παναγιώτης","Χρήστος","Στέλιος","Άγγελος","Ορέστης","Φίλιππος","Λευτέρης"];
+  const girls=["Μαρία","Ελένη","Σοφία","Αθηνά","Κατερίνα","Δήμητρα","Ειρήνη","Αναστασία","Χριστίνα","Ζωή","Ελίνα","Βασιλική","Ιωάννα","Φωτεινή"];
+  const dads=["Γιάννης","Κώστας","Δημήτρης","Νίκος","Βασίλης","Αντώνης","Θοδωρής","Παύλος","Στάθης","Μιχάλης","Χάρης","Σάκης"];
+  const moms=["Άννα","Μαρίνα","Εύα","Δέσποινα","Βάσω","Κική","Νάντια","Ρένα","Λία","Τζένη","Σίσσυ","Μαριλένα"];
+  const fam=[["Παπαδόπουλος","Παπαδοπούλου"],["Γεωργίου","Γεωργίου"],["Νικολάου","Νικολάου"],["Ιωαννίδης","Ιωαννίδου"],["Καραγιάννης","Καραγιάννη"],["Δημητρίου","Δημητρίου"],["Αντωνίου","Αντωνίου"],["Παππάς","Παππά"],["Βασιλείου","Βασιλείου"],["Οικονόμου","Οικονόμου"],["Μαυρίδης","Μαυρίδου"],["Κωνσταντίνου","Κωνσταντίνου"],["Αθανασίου","Αθανασίου"],["Χρήστου","Χρήστου"],["Σταύρου","Σταύρου"],["Τσακίρης","Τσακίρη"],["Ζαχαρίου","Ζαχαρίου"],["Πετρίδης","Πετρίδου"],["Λαζαρίδης","Λαζαρίδου"],["Καλλιάνης","Καλλιάνη"],["Θεοδώρου","Θεοδώρου"],["Μιχαηλίδης","Μιχαηλίδου"],["Ξενίδης","Ξενίδου"],["Βλάχος","Βλάχου"],["Αναγνώστου","Αναγνώστου"],["Φωτίου","Φωτίου"],["Σιδηρόπουλος","Σιδηροπούλου"],["Ράπτης","Ράπτη"],["Κυριακίδης","Κυριακίδου"],["Τριανταφύλλου","Τριανταφύλλου"],["Γκούμας","Γκούμα"],["Τόλιος","Τόλιου"],["Μπίρος","Μπίρου"],["Σαββίδης","Σαββίδου"],["Καρανίκας","Καρανίκα"],["Δρόσος","Δρόσου"],["Ευαγγέλου","Ευαγγέλου"],["Ψαρράς","Ψαρρά"],["Κατσαρός","Κατσαρού"],["Μπακάλης","Μπακάλη"],["Τζήκας","Τζήκα"],["Λιάκος","Λιάκου"],["Χατζής","Χατζή"],["Παύλου","Παύλου"],["Μηλιώτης","Μηλιώτη"],["Σπανός","Σπανού"],["Αργυρίου","Αργυρίου"],["Κοσμίδης","Κοσμίδου"],["Τσιτσάνης","Τσιτσάνη"],["Ρήγας","Ρήγα"],["Μπουρνάς","Μπουρνά"],["Καζάκος","Καζάκου"],["Στεφάνου","Στεφάνου"],["Ζέρβας","Ζέρβα"],["Τσολάκης","Τσολάκη"],["Γαλάνης","Γαλάνη"]];
+  const places=[["Λαγκαδάς","57200"],["Κολχικό","57200"],["Σωχός","57300"],["Λαγκαδάς","57200"],["Λαγκαδικιά","57200"]];
+  const streets=["Εθνικής Αντιστάσεως","Μεγάλου Αλεξάνδρου","Αγίου Δημητρίου","Ελευθερίας","Βενιζέλου","Κεντρική","Ηρώων","Ολύμπου"];
+  const jobs=["Μηχανικός","Δάσκαλος","Έμπορος","Γιατρός","Αγρότης","Υπάλληλος","Λογιστής","Ιδιωτικός υπάλληλος","Δικηγόρος","Τεχνίτης","Φαρμακοποιός","Αστυνομικός"];
+  const allergies=["ΟΥΔΕΝ","ΟΥΔΕΝ","ΟΥΔΕΝ","ΟΥΔΕΝ","ΟΥΔΕΝ","ΟΥΔΕΝ","Αλλεργία στο αυγό","Δυσανεξία στη λακτόζη","Άσθμα (ανταπόκριση με συσκευή)","Αλλεργία στους ξηρούς καρπούς"];
+  const meals=["Έφαγε κανονικά","Έφαγε κανονικά","Έφαγε πολύ καλά","Έφαγε λίγο","Δεν έφαγε"];
+  const sleeps=["30 λεπτά","1 ώρα","1:30","2 ώρες","2:30","3 ώρες","Δεν κοιμήθηκε"];
+  const moods=["😊 Χαρούμενο","😄 Πολύ χαρούμενο","😊 Χαρούμενο","😐 Ουδέτερο","😴 Κουρασμένο"];
+  const notes=["Σήμερα έπαιξε πολύ με τα τουβλάκια.","Είχε λίγο κλάμα το πρωί αλλά ηρέμησε γρήγορα.","Τραγούδησε μαζί με τους φίλους του.","Ζωγράφισε ένα όμορφο σχέδιο!","Ήταν πολύ κοινωνικό και χαρούμενο.","","",""];
+  const dateOffset = (days)=>{ const d=new Date(); d.setDate(d.getDate()-days); return d.toISOString().split("T")[0]; };
+  const plan=[["vr-a",10],["vr-b",10],["vr-c",10],["pa-a",13],["pa-b",13]];
+  const families=shuffle(fam);
+  const out=[]; let n=0;
+  plan.forEach(([tid,count])=>{
+    const t=TMIMATA.find(x=>x.id===tid);
+    for(let i=0;i<count;i++){
+      const [fm,ff]=families[n % families.length];
+      const isGirl = rnd()<0.5;
+      const first = isGirl?pick(girls):pick(boys);
+      const ageDays = t.type==="vrefiko" ? 200+Math.floor(rnd()*620) : 930+Math.floor(rnd()*900);
+      const [town,tk]=pick(places);
+      const present = rnd()<0.78;
+      const paid = rnd()<0.55;
+      const phone = () => "69"+String(10000000+Math.floor(rnd()*89999999));
+      const id = 9000+n;
+      const kid = {
+        id, name:`${first} ${fm}`, birthdate:dateOffset(ageDays), topos_katoikias:town, odos:pick(streets), arithmos:String(1+Math.floor(rnd()*80)), tk, tilefono_oikias:"23940"+String(10000+Math.floor(rnd()*89999)),
+        tmima:tid,
+        pat_name:`${pick(dads)} ${fm}`, pat_kinito:phone(), pat_epaggelma:pick(jobs), pat_ergasia:"", pat_afm:String(100000000+Math.floor(rnd()*899999999)), pat_doy:"Λαγκαδά", pat_email:`pateras${n+1}@example.com`,
+        mit_name:`${pick(moms)} ${ff}`, mit_kinito:phone(), mit_epaggelma:pick(jobs), mit_ergasia:"", mit_afm:String(100000000+Math.floor(rnd()*899999999)), mit_doy:"Λαγκαδά", mit_email:`mitera${n+1}@example.com`,
+        pappous_name:"", pappous_kinito:"", giagia_name: rnd()<0.5?`${pick(moms)} ${ff}`:"", giagia_kinito: "",
+        ep1_name:"", ep1_kinito:"", ep2_name:"", ep2_kinito:"", ep3_name:"", ep3_kinito:"", ep4_name:"", ep4_kinito:"",
+        iatrika:pick(allergies),
+        scholiko: rnd()<0.35?"yes":"no", ora_afixis:"08:00", ora_anaxorisis:"15:00",
+        mesimeri: rnd()<0.8?"yes":"no",
+        parent_username: n<3?"gonea"+(n+1):"", parent_password: n<3?"Gonea!2026":"",
+        par_espa_baba:rnd()<0.7, par_espa_baba_date:null, par_espa_baba_hist:[],
+        par_espa_mama:rnd()<0.7, par_espa_mama_date:null, par_espa_mama_hist:[],
+        par_did_baba:rnd()<0.6,  par_did_baba_date:null,  par_did_baba_hist:[],
+        par_did_mama:rnd()<0.6,  par_did_mama_date:null,  par_did_mama_hist:[],
+        par_erg_apodeixi:rnd()<0.8, par_erg_apodeixi_date:null, par_erg_apodeixi_hist:[],
+        par_erg_timolog:rnd()<0.5,  par_erg_timolog_date:null,  par_erg_timolog_hist:[],
+        present, didaktra:paid?"paid":"pending", amount:t.type==="vrefiko"?350:280,
+        daily_reports:[], messages:[], docs:[],
+      };
+      // Δελτία: σήμερα (για όσα είναι παρόντα) + μερικές προηγούμενες μέρες
+      [0,1,2].forEach(back=>{
+        if(back===0 && !present) return;
+        if(back>0 && rnd()<0.25) return;
+        kid.daily_reports.push({
+          date: back===0?TODAY:dateOffset(back),
+          prwino:pick(meals), mesimeri:pick(meals), apogeyma:pick(meals), ypnos:pick(sleeps),
+          drastiriotita:true, proaulismos:rnd()<0.8, mood:pick(moods), notes:pick(notes), media:[],
+        });
+      });
+      out.push(kid); n++;
+    }
+  });
+  return out;
+}
+const KIDS0 = DEMO ? genDemoKids() : genKids();
 
 const GALLERY_ITEMS = [];
 
@@ -52,6 +123,12 @@ const PT_MESSAGES = {
   },
   subscribe(fn){ this.subs.push(fn); return ()=>{ this.subs = this.subs.filter(f=>f!==fn); }; },
 };
+if(DEMO){
+  const demoTexts=["Καλημέρα, θα έρθω να το πάρω νωρίτερα σήμερα, γύρω στις 13:00.","Το παιδί είχε λίγο πυρετό χθες το βράδυ. Παρακαλώ να το προσέχετε.","Ευχαριστούμε πολύ για τις φωτογραφίες, ήταν υπέροχες!"];
+  PT_MESSAGES.list = KIDS0.slice(3,6).map((k,i)=>{ const t=TMIMATA.find(x=>x.id===k.tmima); return {
+    id:Date.now()+i, from_role:"parent", from_name:k.mit_name, child_id:k.id, child_name:k.name,
+    to_teacher:t?.teacher||"", tmima:k.tmima, text:demoTexts[i], date:TODAY, time:["08:41","09:15","10:02"][i], read:false }; });
+}
 
 // ─── ΠΡΩΤΟΚΟΛΛΑ ΕΠΙΧΕΙΡΗΣΗΣ (υπογεγραμμένα από προσωπικό) ─────────────────────
 // ⚠️ PLACEHOLDER — θα αντικατασταθεί με τα πραγματικά κείμενα όταν ανεβούν.
@@ -90,7 +167,9 @@ const CSS = `
 
 *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
 html { font-size:16px; }
-body { font-family:'DM Sans',sans-serif; background:#F5F1EA; color:#2A2A2A; -webkit-font-smoothing:antialiased; }
+body { font-family:'DM Sans',sans-serif; background:#F6F4EE; color:#2A2A2A; -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility; }
+button { font-family:inherit; }
+button:focus-visible, .nav-item:focus-visible { outline:2px solid #F5B800; outline-offset:2px; }
 
 :root {
   /* Ονειροχώρα brand colors from logo */
@@ -104,8 +183,8 @@ body { font-family:'DM Sans',sans-serif; background:#F5F1EA; color:#2A2A2A; -web
   --blue:    #3AAED8;   /* logo light blue */
   --blue2:   #EDF6FB;   /* light blue tint */
   --beige:   #F8F5F0;   /* warm background */
-  --beige2:  #EEE9E0;
-  --beige3:  #E2DBD0;
+  --beige2:  #F1EDE5;
+  --beige3:  #E8E3D9;
   --burg:    #CC2929;   /* use red as accent */
   --burg2:   #FFF0F0;
   --gray:    #ECE8E1;
@@ -113,57 +192,72 @@ body { font-family:'DM Sans',sans-serif; background:#F5F1EA; color:#2A2A2A; -web
   --text:    #1A2E1A;   /* dark green-tinted text */
   --text2:   #5A6A5A;
   --text3:   #96A096;
-  --white:   #FDFCFA;
-  --shadow:  0 1px 3px rgba(45,106,45,.07), 0 4px 16px rgba(45,106,45,.09);
-  --shadow2: 0 2px 8px rgba(45,106,45,.09), 0 12px 40px rgba(45,106,45,.14);
-  --radius:  14px;
-  --radius2: 8px;
+  --white:   #FFFFFF;
+  --shadow:  0 1px 2px rgba(20,40,20,.04), 0 6px 18px rgba(20,40,20,.05);
+  --shadow2: 0 2px 6px rgba(20,40,20,.06), 0 16px 40px rgba(20,40,20,.10);
+  --radius:  16px;
+  --radius2: 10px;
 }
 
 /* ── SCROLLBAR ── */
 ::-webkit-scrollbar { width:6px; height:6px; }
-::-webkit-scrollbar-track { background:var(--beige2); }
-::-webkit-scrollbar-thumb { background:var(--gray2); border-radius:3px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background:#D8D2C6; border-radius:3px; }
+::-webkit-scrollbar-thumb:hover { background:#C4BCAC; }
 
 /* ── LAYOUT ── */
-.shell { display:flex; height:100vh; overflow:hidden; }
+.shell { display:flex; height:100vh; height:100dvh; overflow:hidden; }
 .sidebar {
-  width:248px; flex-shrink:0;
-  background:#1A3A1A;
+  width:256px; flex-shrink:0;
+  background:linear-gradient(180deg,#1F4421 0%,#173519 52%,#112A13 100%);
   display:flex; flex-direction:column;
-  position:relative; overflow:hidden;
-  transition:width .25s cubic-bezier(.4,0,.2,1);
+  position:relative; z-index:30;
+  transition:width .28s cubic-bezier(.4,0,.2,1), transform .28s cubic-bezier(.4,0,.2,1), visibility 0s;
+  box-shadow:1px 0 0 rgba(0,0,0,.25), 6px 0 28px rgba(15,35,15,.10);
 }
-.sidebar.collapsed { width:68px; }
-.sidebar.collapsed .sb-brand h2,
-.sidebar.collapsed .sb-brand span,
-.sidebar.collapsed .sb-uname,
-.sidebar.collapsed .sb-urole,
-.sidebar.collapsed .nav-item span:not(.nav-ico):not(.nav-badge),
-.sidebar.collapsed .sb-section,
-.sidebar.collapsed .sb-logout span,
-.sidebar.collapsed .nav-label { display:none; }
-.sidebar.collapsed .nav-item { justify-content:center; padding:11px 0; }
-.sidebar.collapsed .nav-ico { width:auto; }
-.sidebar.collapsed .sb-user { justify-content:center; padding:14px 0; }
-.sidebar.collapsed .sb-brand { justify-content:center; }
-.sidebar.collapsed .sb-logout { padding:9px 0; }
-.sidebar.collapsed .nav-badge { position:absolute; top:4px; right:10px; }
-.sb-toggle {
-  position:absolute; top:24px; right:-12px; z-index:20;
-  width:24px; height:24px; border-radius:50%;
-  background:var(--green); color:#fff; border:2px solid #1A3A1A;
-  display:flex; align-items:center; justify-content:center;
-  cursor:pointer; font-size:11px; transition:all .2s;
-  box-shadow:0 2px 6px rgba(0,0,0,.2);
-}
-.sb-toggle:hover { background:var(--green2); transform:scale(1.1); }
-.mobile-menu-btn { display:none; }
 .sidebar::before {
-  content:''; position:absolute; inset:0;
-  background: radial-gradient(ellipse at 20% 80%, rgba(255,255,255,.04) 0%, transparent 60%),
-              radial-gradient(ellipse at 80% 10%, rgba(255,255,255,.03) 0%, transparent 50%);
-  pointer-events:none;
+  content:''; position:absolute; inset:0; pointer-events:none;
+  background: radial-gradient(ellipse at 15% 100%, rgba(245,184,0,.07) 0%, transparent 55%),
+              radial-gradient(ellipse at 90% 0%, rgba(255,255,255,.05) 0%, transparent 50%);
+}
+.sb-toggle {
+  position:absolute; top:26px; right:-13px; z-index:20;
+  width:26px; height:26px; border-radius:50%;
+  background:#fff; color:var(--green); border:1px solid var(--beige3);
+  display:flex; align-items:center; justify-content:center;
+  cursor:pointer; transition:all .2s;
+  box-shadow:0 2px 8px rgba(20,40,20,.18);
+}
+.sb-toggle:hover { background:var(--green); color:#fff; border-color:var(--green); }
+.mobile-menu-btn {
+  display:none; width:40px; height:40px; border-radius:12px; flex-shrink:0;
+  background:#fff; border:1px solid var(--beige3); color:var(--green);
+  align-items:center; justify-content:center; cursor:pointer;
+  box-shadow:0 1px 2px rgba(20,40,20,.06);
+}
+.mobile-menu-btn:active { background:var(--green3); }
+.mobile-overlay { display:none; }
+.ico { display:inline-block; vertical-align:middle; flex-shrink:0; }
+.section-hd .ico, .report-key .ico, .flabel .ico, .lerr .ico, .dash-search-hero h2 .ico { margin-right:7px; vertical-align:-3px; }
+.card-title .ico { color:var(--green2); }
+
+/* Μενού «ράγα» (μόνο υπολογιστής) */
+@media (min-width: 821px) {
+  .sidebar.collapsed { width:78px; }
+  .sidebar.collapsed .sb-brand h2,
+  .sidebar.collapsed .sb-brand span,
+  .sidebar.collapsed .sb-uname,
+  .sidebar.collapsed .sb-urole,
+  .sidebar.collapsed .sb-section,
+  .sidebar.collapsed .sb-logout-label,
+  .sidebar.collapsed .nav-label { display:none; }
+  .sidebar.collapsed .nav-item { justify-content:center; padding:12px 0; }
+  .sidebar.collapsed .nav-item.active::before { left:-12px; }
+  .sidebar.collapsed .sb-user { justify-content:center; padding:9px 0; margin:14px 10px 4px; }
+  .sidebar.collapsed .sb-brand { justify-content:center; }
+  .sidebar.collapsed .sb-head { padding:18px 0 14px; }
+  .sidebar.collapsed .sb-logout { padding:11px 0; justify-content:center; }
+  .sidebar.collapsed .nav-badge { position:absolute; top:3px; right:12px; padding:0 5px; font-size:9px; }
 }
 .main { flex:1; display:flex; flex-direction:column; overflow:hidden; min-width:0; }
 
@@ -223,87 +317,100 @@ body { font-family:'DM Sans',sans-serif; background:#F5F1EA; color:#2A2A2A; -web
 .chip:hover { background:#CC2929; color:var(--white); }
 
 /* ── SIDEBAR ── */
-.sb-head { padding:20px 20px 14px; border-bottom:1px solid rgba(255,255,255,.08); position:relative; }
-.sb-brand { display:flex; align-items:center; gap:11px; }
-.sb-icon { width:44px; height:44px; border-radius:10px; background:transparent; display:flex; align-items:center; justify-content:center; flex-shrink:0; overflow:hidden; }
-.sb-brand h2 { font-family:'Playfair Display',serif; font-size:17px; font-weight:700; color:#fff; line-height:1.15; }
-.sb-brand span { font-size:10px; color:rgba(255,255,255,.4); font-weight:400; display:block; margin-top:1px; }
-.sb-user { padding:14px 20px; border-bottom:1px solid rgba(255,255,255,.08); display:flex; align-items:center; gap:10px; }
+.sb-head { padding:22px 20px 16px; border-bottom:1px solid rgba(255,255,255,.07); position:relative; }
+.sb-brand { display:flex; align-items:center; gap:12px; }
+.sb-icon { width:46px; height:46px; border-radius:14px; background:#fff; display:flex; align-items:center; justify-content:center; flex-shrink:0; overflow:hidden; box-shadow:0 2px 10px rgba(0,0,0,.25); }
+.sb-brand h2 { font-family:'Playfair Display',serif; font-size:18px; font-weight:700; color:#fff; line-height:1.15; letter-spacing:.01em; }
+.sb-brand span { font-size:10.5px; color:rgba(255,255,255,.5); font-weight:400; display:block; margin-top:2px; letter-spacing:.02em; }
+.sb-user { margin:14px 12px 4px; padding:10px 12px; border-radius:14px; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.07); display:flex; align-items:center; gap:10px; position:relative; }
 .sb-av {
-  width:34px; height:34px; border-radius:10px;
-  background:rgba(255,255,255,.15); color:#fff;
+  width:36px; height:36px; border-radius:11px;
+  background:linear-gradient(135deg,#F5B800,#E39F00); color:#1A3A1A;
   display:flex; align-items:center; justify-content:center;
-  font-size:11px; font-weight:700; flex-shrink:0; letter-spacing:.02em;
+  font-size:12px; font-weight:800; flex-shrink:0; letter-spacing:.02em;
 }
 .sb-uname { font-size:13px; font-weight:600; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:150px; }
-.sb-urole { font-size:11px; color:rgba(255,255,255,.4); font-weight:400; margin-top:1px; }
-.sb-nav { flex:1; padding:10px 12px; overflow-y:auto; }
-.sb-section { font-size:10px; font-weight:600; color:rgba(255,255,255,.28); letter-spacing:.1em; text-transform:uppercase; padding:14px 8px 6px; }
+.sb-urole { font-size:11px; color:rgba(255,255,255,.5); font-weight:400; margin-top:1px; }
+.sb-nav { flex:1; padding:8px 12px 12px; overflow-y:auto; position:relative; }
+.sb-nav::-webkit-scrollbar { width:4px; }
+.sb-nav::-webkit-scrollbar-thumb { background:rgba(255,255,255,.15); }
+.sb-section { font-size:10px; font-weight:700; color:rgba(255,255,255,.34); letter-spacing:.14em; text-transform:uppercase; padding:14px 10px 8px; }
 .nav-item {
-  display:flex; align-items:center; gap:10px; padding:9px 10px;
-  border-radius:10px; cursor:pointer; transition:all .15s;
-  font-size:13px; font-weight:500; color:rgba(255,255,255,.58);
-  position:relative; margin-bottom:1px;
+  display:flex; align-items:center; gap:13px; padding:10px 12px;
+  border-radius:12px; cursor:pointer; transition:background .15s, color .15s;
+  font-size:13.5px; font-weight:500; color:rgba(255,255,255,.68);
+  position:relative; margin-bottom:2px; user-select:none; -webkit-tap-highlight-color:transparent;
 }
-.nav-item:hover { background:rgba(255,255,255,.08); color:rgba(255,255,255,.9); }
-.nav-item.active { background:rgba(255,255,255,.13); color:#fff; font-weight:600; }
+.nav-item:hover { background:rgba(255,255,255,.08); color:#fff; }
+.nav-item.active { background:linear-gradient(90deg,rgba(245,184,0,.18),rgba(255,255,255,.07)); color:#fff; font-weight:600; }
 .nav-item.active::before {
   content:''; position:absolute; left:-12px; top:50%; transform:translateY(-50%);
-  width:3px; height:50%; background:#F5B800; border-radius:0 2px 2px 0;
+  width:4px; height:56%; background:#F5B800; border-radius:0 4px 4px 0;
 }
-.nav-ico { font-size:16px; width:20px; text-align:center; opacity:.85; }
+.nav-ico { width:20px; height:20px; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0; opacity:.9; }
+.nav-item.active .nav-ico { color:#F5B800; opacity:1; }
 .nav-badge { margin-left:auto; background:var(--red); color:#fff; font-size:10px; font-weight:700; padding:1px 7px; border-radius:10px; }
-.sb-foot { padding:12px; border-top:1px solid rgba(255,255,255,.08); }
+.sb-foot { padding:12px; border-top:1px solid rgba(255,255,255,.07); position:relative; }
 .sb-logout {
-  width:100%; padding:9px; background:rgba(255,255,255,.06); color:rgba(255,255,255,.6);
-  border:1px solid rgba(255,255,255,.1); border-radius:10px; cursor:pointer;
+  width:100%; padding:10px; background:rgba(255,255,255,.06); color:rgba(255,255,255,.75);
+  border:1px solid rgba(255,255,255,.10); border-radius:12px; cursor:pointer;
   font-family:'DM Sans',sans-serif; font-size:13px; font-weight:500; transition:all .15s;
+  display:flex; align-items:center; justify-content:center; gap:9px;
 }
-.sb-logout:hover { background:rgba(255,100,100,.15); color:rgba(255,160,160,.9); border-color:rgba(255,100,100,.2); }
+.sb-logout:hover { background:rgba(255,100,100,.16); color:#FFC4C4; border-color:rgba(255,100,100,.28); }
 
 /* ── TOPBAR ── */
 .topbar {
-  height:60px; background:var(--white); border-bottom:1px solid var(--beige3);
-  padding:0 28px; display:flex; align-items:center; justify-content:space-between;
-  flex-shrink:0; box-shadow:0 1px 0 var(--beige3);
+  height:66px; background:rgba(255,255,255,.88); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--beige3);
+  padding:0 30px; display:flex; align-items:center; justify-content:space-between; gap:12px;
+  flex-shrink:0; position:relative; z-index:10;
 }
-.topbar-l h1 { font-family:'Playfair Display',serif; font-size:19px; font-weight:600; color:var(--green); }
-.topbar-l p { font-size:12px; color:var(--text3); margin-top:1px; }
-.topbar-r { display:flex; align-items:center; gap:10px; }
-.top-date { background:var(--green3); color:var(--green); padding:5px 13px; border-radius:20px; font-size:12px; font-weight:600; border:1px solid rgba(45,106,45,.15); }
-.top-notif { width:36px; height:36px; border-radius:10px; background:var(--beige2); border:none; cursor:pointer; font-size:16px; display:flex; align-items:center; justify-content:center; position:relative; transition:all .15s; }
-.top-notif:hover { background:var(--green3); }
-.notif-dot { position:absolute; top:7px; right:7px; width:7px; height:7px; background:var(--red); border-radius:50%; border:2px solid var(--white); }
-.content { flex:1; overflow-y:auto; padding:28px; }
+.topbar-lw { display:flex; align-items:center; gap:12px; min-width:0; }
+.topbar-l { min-width:0; }
+.topbar-l h1 { font-family:'Playfair Display',serif; font-size:21px; font-weight:600; color:var(--green); letter-spacing:.005em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.topbar-l p { font-size:12px; color:var(--text3); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.topbar-r { display:flex; align-items:center; gap:10px; flex-shrink:0; }
+.top-date { display:inline-flex; align-items:center; gap:7px; background:var(--green3); color:var(--green); padding:7px 14px; border-radius:20px; font-size:12px; font-weight:600; border:1px solid rgba(45,106,45,.12); }
+.demo-chip { background:#FFF4CC; color:#8A6400; border:1px solid #F0D68A; font-size:10.5px; font-weight:800; letter-spacing:.08em; padding:5px 10px; border-radius:20px; white-space:nowrap; }
+.top-notif { width:40px; height:40px; border-radius:12px; background:#fff; border:1px solid var(--beige3); cursor:pointer; color:var(--text2); display:flex; align-items:center; justify-content:center; position:relative; transition:all .15s; box-shadow:0 1px 2px rgba(20,40,20,.05); }
+.top-notif:hover { background:var(--green3); color:var(--green); border-color:rgba(45,106,45,.25); }
+.notif-dot { position:absolute; top:8px; right:9px; width:9px; height:9px; background:var(--red); border-radius:50%; border:2px solid #fff; }
+.content { flex:1; overflow-y:auto; padding:30px 32px 40px; }
+.parent-content { flex:1; overflow-y:auto; padding:28px 32px; }
 
 /* ── CARDS & GRID ── */
 .stats-row { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:24px; }
+.stats-row { align-items:stretch; }
 .stat-card {
-  background:var(--white); border-radius:var(--radius); padding:20px;
+  height:100%;
+  background:var(--white); border-radius:var(--radius); padding:22px;
   box-shadow:var(--shadow); border:1px solid var(--beige3); transition:all .2s;
 }
 .stat-card:hover { box-shadow:var(--shadow2); transform:translateY(-1px); }
-.stat-ico { width:44px; height:44px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:20px; margin-bottom:12px; }
-.stat-val { font-family:'Playfair Display',serif; font-size:28px; font-weight:700; color:var(--text); line-height:1; }
+.stat-ico { width:44px; height:44px; border-radius:13px; display:flex; align-items:center; justify-content:center; font-size:20px; margin-bottom:14px; color:var(--green); }
+.stat-val { font-family:'Playfair Display',serif; font-size:30px; font-weight:700; color:var(--text); line-height:1; letter-spacing:-.01em; }
 .stat-lbl { font-size:12px; color:var(--text3); font-weight:500; margin-top:4px; }
 .stat-trend { display:inline-block; font-size:11px; font-weight:600; padding:2px 8px; border-radius:10px; margin-top:8px; }
 .trend-up { background:#ECFDF5; color:#059669; }
 .trend-dn { background:#FEF2F2; color:#DC2626; }
 .g2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px; }
 .g3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; margin-bottom:20px; }
-.card { background:var(--white); border-radius:var(--radius); padding:22px; box-shadow:var(--shadow); border:1px solid var(--beige3); }
+.card { background:var(--white); border-radius:var(--radius); padding:24px; box-shadow:var(--shadow); border:1px solid var(--beige3); }
 .card-title { font-family:'Playfair Display',serif; font-size:15px; font-weight:600; color:var(--green); margin-bottom:16px; display:flex; align-items:center; gap:8px; }
 
 /* ── TABLE ── */
 .tbl-wrap { overflow-x:auto; }
 table { width:100%; border-collapse:collapse; font-size:13px; }
-th { text-align:left; padding:9px 12px; font-size:11px; font-weight:600; color:var(--text3); text-transform:uppercase; letter-spacing:.06em; border-bottom:1.5px solid var(--beige3); white-space:nowrap; }
+th { text-align:left; padding:11px 12px; font-size:11px; font-weight:700; color:var(--text3); text-transform:uppercase; letter-spacing:.08em; background:#FAF8F3; border-bottom:1px solid var(--beige3); white-space:nowrap; }
+th:first-child { border-top-left-radius:10px; }
+th:last-child { border-top-right-radius:10px; }
 td { padding:11px 12px; border-bottom:1px solid var(--beige3); vertical-align:middle; }
 tr:last-child td { border-bottom:none; }
 tbody tr { transition:background .1s; cursor:pointer; }
 tbody tr:hover td { background:var(--beige); }
 .av { width:30px; height:30px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; color:#fff; flex-shrink:0; }
-.badge { display:inline-block; padding:3px 9px; border-radius:20px; font-size:11px; font-weight:600; }
+.badge { display:inline-block; white-space:nowrap; padding:3px 9px; border-radius:20px; font-size:11px; font-weight:600; }
 .b-green { background:#ECFDF5; color:#059669; }
 .b-red   { background:#FEF2F2; color:#DC2626; }
 .b-blue  { background:#EFF6FF; color:#2563EB; }
@@ -314,7 +421,7 @@ tbody tr:hover td { background:var(--beige); }
 /* ── FORMS & INPUTS ── */
 .search-row { display:flex; gap:10px; margin-bottom:16px; align-items:center; }
 .search-box { position:relative; flex:1; }
-.search-box::before { content:'🔍'; position:absolute; left:13px; top:50%; transform:translateY(-50%); font-size:13px; pointer-events:none; }
+.search-box::before { content:''; position:absolute; left:14px; top:50%; transform:translateY(-50%); width:15px; height:15px; pointer-events:none; background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2396A096' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E") center/contain no-repeat; }
 .sinput {
   width:100%; padding:9px 14px 9px 38px;
   border:1.5px solid var(--beige3); border-radius:var(--radius2);
@@ -341,19 +448,20 @@ tbody tr:hover td { background:var(--beige); }
 .section-hd { font-size:11px; font-weight:700; color:var(--green); letter-spacing:.08em; text-transform:uppercase; padding:14px 0 8px; border-bottom:1px solid var(--green3); margin-bottom:12px; }
 
 /* ── BUTTONS ── */
-.btn { display:inline-flex; align-items:center; gap:6px; padding:9px 16px; border-radius:var(--radius2); font-family:'DM Sans',sans-serif; font-size:13px; font-weight:600; cursor:pointer; border:none; transition:all .15s; }
-.btn-primary { background:var(--green); color:var(--white); }
-.btn-primary:hover { background:var(--green2); box-shadow:0 3px 12px rgba(47,79,62,.25); }
-.btn-ghost { background:var(--beige2); color:var(--text2); }
-.btn-ghost:hover { background:var(--beige3); color:var(--text); }
+.btn { display:inline-flex; align-items:center; justify-content:center; gap:7px; padding:10px 18px; border-radius:var(--radius2); font-family:'DM Sans',sans-serif; font-size:13px; font-weight:600; cursor:pointer; border:none; transition:all .15s; letter-spacing:.005em; -webkit-tap-highlight-color:transparent; }
+.btn:active { transform:translateY(1px); }
+.btn-primary { background:linear-gradient(180deg,#378237,#2D6A2D); color:#fff; box-shadow:0 1px 2px rgba(20,60,20,.28), inset 0 1px 0 rgba(255,255,255,.16); }
+.btn-primary:hover { background:linear-gradient(180deg,#3F903F,#348234); box-shadow:0 4px 14px rgba(45,106,45,.30), inset 0 1px 0 rgba(255,255,255,.18); transform:translateY(-1px); }
+.btn-ghost { background:#fff; color:var(--text2); border:1px solid var(--beige3); }
+.btn-ghost:hover { background:var(--beige); color:var(--text); border-color:var(--gray2); }
 .btn-danger { background:var(--burg2); color:var(--burg); }
 .btn-sm { padding:6px 12px; font-size:12px; }
 .btn-xs { padding:4px 9px; font-size:11px; border-radius:6px; }
 
 /* ── MODAL ── */
-.modal-bg { position:fixed; inset:0; background:rgba(42,42,42,.4); z-index:1000; display:flex; align-items:center; justify-content:center; padding:20px; backdrop-filter:blur(4px); animation:fi .2s; }
+.modal-bg { position:fixed; inset:0; background:rgba(18,36,20,.46); z-index:1000; display:flex; align-items:center; justify-content:center; padding:20px; backdrop-filter:blur(4px); animation:fi .2s; }
 @keyframes fi { from{opacity:0} to{opacity:1} }
-.modal { background:var(--white); border-radius:20px; padding:28px; width:100%; max-width:640px; max-height:88vh; overflow-y:auto; box-shadow:0 32px 80px rgba(0,0,0,.2); animation:rise .3s cubic-bezier(.22,1,.36,1); }
+.modal { background:var(--white); border-radius:22px; padding:30px; width:100%; max-width:640px; max-height:88vh; overflow-y:auto; box-shadow:0 30px 90px rgba(10,25,10,.28); animation:rise .3s cubic-bezier(.22,1,.36,1); }
 .modal-lg { max-width:780px; }
 .modal-title { font-family:'Playfair Display',serif; font-size:18px; font-weight:600; color:var(--green); margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; }
 .modal-close { background:var(--beige2); border:none; width:30px; height:30px; border-radius:8px; font-size:14px; cursor:pointer; color:var(--text2); display:flex; align-items:center; justify-content:center; }
@@ -514,7 +622,7 @@ tbody tr:hover td { background:var(--beige); }
 }
 .gsearch-input:focus { border-color:var(--green); background:var(--white); width:340px; box-shadow:0 0 0 3px rgba(45,106,45,.1); }
 .gsearch-input::placeholder { color:var(--text3); }
-.gsearch-ico { position:absolute; left:12px; top:50%; transform:translateY(-50%); font-size:14px; pointer-events:none; }
+.gsearch-ico { position:absolute; left:13px; top:50%; transform:translateY(-50%); pointer-events:none; color:var(--text3); display:flex; }
 .gsearch-results {
   position:absolute; top:calc(100% + 8px); right:0;
   width:420px; background:var(--white); border-radius:16px;
@@ -559,23 +667,39 @@ tbody tr:hover td { background:var(--beige); }
   transition:background .15s;
 }
 .dash-search-bar button:hover { background:#B52222; }
-.dash-search-ico { position:absolute; left:16px; top:50%; transform:translateY(-50%); font-size:18px; pointer-events:none; z-index:1; }
+.dash-search-ico { position:absolute; left:17px; top:50%; transform:translateY(-50%); pointer-events:none; z-index:1; color:var(--text3); display:flex; }
 
 /* ── MOBILE RESPONSIVE ── */
 @media (max-width: 820px) {
-  .sidebar:not(.collapsed) { width:248px; }
-  .sidebar.collapsed { width:0; overflow:visible; }
-  .sidebar.collapsed .sb-toggle { right:-42px; }
-  .mobile-overlay { display:block; position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:199; animation:fi .2s; }
-  .content { padding:16px; }
-  .topbar { padding:0 14px; }
-  .gsearch-input { width:130px; }
-  .gsearch-input:focus { width:170px; }
+  /* Το μενού γίνεται συρτάρι που ανοίγει πάνω από τη σελίδα */
+  .sidebar {
+    position:fixed; left:0; top:0; bottom:0; z-index:200;
+    width:276px; max-width:84vw;
+    box-shadow:0 0 44px rgba(10,25,10,.40);
+  }
+  .sidebar.collapsed {
+    transform:translateX(-104%); visibility:hidden; box-shadow:none;
+    transition:transform .28s cubic-bezier(.4,0,.2,1), visibility 0s linear .28s;
+  }
+  .sb-toggle { display:none; }
+  .mobile-menu-btn { display:flex; }
+  /* Ελαφρύ φόντο, χωρίς θόλωμα: η σελίδα πίσω φαίνεται καθαρά */
+  .mobile-overlay { display:block; position:fixed; inset:0; background:rgba(16,34,18,.30); z-index:150; animation:fi .2s; -webkit-tap-highlight-color:transparent; }
+  .content, .parent-content { padding:16px 14px 28px; }
+  .topbar { padding:0 12px; height:60px; }
+  .topbar-l h1 { font-size:17px; }
+  .topbar-l p { display:none; }
+  .topbar-r { gap:8px; }
+  .gsearch-input { width:116px; }
+  .gsearch-input:focus { width:150px; }
   .gsearch-results { width:290px; right:-50px; }
   .stats-row { grid-template-columns:1fr 1fr; }
   .tmima-grid { grid-template-columns:1fr 1fr; }
   .g2, .g3 { grid-template-columns:1fr; }
   .top-date { display:none; }
+  .demo-chip { display:none; }
+  .card { padding:18px; }
+  .modal { padding:22px 18px; border-radius:20px; }
   .form-grid-4, .form-grid-3, .fin-row, .exoda-row { grid-template-columns:1fr !important; gap:4px !important; }
   .prog-grid { grid-template-columns:1fr 1fr !important; }
 }
@@ -616,10 +740,62 @@ const MEAL_OPTS = ["Έφαγε κανονικά","Έφαγε λίγο","Δεν �
 const SLEEP_OPTS = ["15 λεπτά","30 λεπτά","45 λεπτά","1 ώρα","1:15","1:30","1:45","2 ώρες","2:15","2:30","2:45","3 ώρες","Δεν κοιμήθηκε"];
 const MOOD_OPTS = ["😊 Χαρούμενο","😄 Πολύ χαρούμενο","😐 Ουδέτερο","😴 Κουρασμένο"];
 
+// ─── ΕΙΚΟΝΙΔΙΑ (καθαρά γραμμικά, ίδιο στυλ παντού) ──────────────────────────────
+const ICON_PATHS = {
+  home:     <><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5"/></>,
+  clipboard:<><rect x="8" y="2.5" width="8" height="4" rx="1.2"/><path d="M16 4.5h2a2 2 0 0 1 2 2V20a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6.5a2 2 0 0 1 2-2h2"/><path d="M9 12h6M9 16h4"/></>,
+  check:    <><circle cx="12" cy="12" r="9"/><path d="m8.5 12.5 2.5 2.5 4.5-5"/></>,
+  filetext: <><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></>,
+  image:    <><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="1.6"/><path d="m21 15-4.5-4.5L6 21"/></>,
+  message:  <><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20.5l1.4-4.6A8 8 0 1 1 21 12z"/></>,
+  calendar: <><rect x="3" y="4.5" width="18" height="16.5" rx="3"/><path d="M8 2.5v4M16 2.5v4M3 10h18"/></>,
+  bus:      <><rect x="4" y="3" width="16" height="14" rx="3"/><path d="M4 11h16M7 17v3M17 17v3"/><path d="M8 14h.01M16 14h.01"/></>,
+  euro:     <><path d="M18 6.5A7 7 0 1 0 18 17.5"/><path d="M4 10h9M4 14h9"/></>,
+  grid:     <><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 9h18M9 21V9"/></>,
+  chart:    <><path d="M3 3v18h18"/><path d="M7 15v3M12 10v8M17 6v12"/></>,
+  users:    <><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.7a3.5 3.5 0 0 1 0 6.6M18 14.2a6.5 6.5 0 0 1 3.5 5.8"/></>,
+  logout:   <><path d="M9 21H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3"/><path d="m16 17 5-5-5-5M21 12H9"/></>,
+  bell:     <><path d="M6 8a6 6 0 1 1 12 0c0 7 3 8 3 8H3s3-1 3-8"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></>,
+  menu:     <><path d="M4 7h16M4 12h16M4 17h10"/></>,
+  chevL:    <><path d="m15 6-6 6 6 6"/></>,
+  chevR:    <><path d="m9 6 6 6-6 6"/></>,
+  search:   <><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></>,
+  x:        <><path d="M6 6l12 12M18 6 6 18"/></>,
+  shield:   <><path d="M12 3 4.5 6v5.5c0 4.6 3.1 8.2 7.5 9.5 4.4-1.3 7.5-4.9 7.5-9.5V6z"/></>,
+  smile:    <><circle cx="12" cy="12" r="9"/><path d="M8.5 14a4.2 4.2 0 0 0 7 0"/><path d="M9 9.5h.01M15 9.5h.01"/></>,
+  clock:    <><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></>,
+  percent:  <><path d="M19 5 5 19"/><circle cx="7" cy="7" r="2.2"/><circle cx="17" cy="17" r="2.2"/></>,
+  mail:     <><rect x="3" y="5" width="18" height="14" rx="3"/><path d="m4 7 8 6 8-6"/></>,
+  user:     <><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></>,
+  mappin:   <><path d="M12 21s7-6.2 7-11.5a7 7 0 1 0-14 0C5 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></>,
+  utensils: <><path d="M6 3v7a2 2 0 0 0 2 2v9M10 3v7a2 2 0 0 1-2 2M17 21V3c-2.5 1.5-3.5 4.5-3.5 8H17"/></>,
+  moon:     <><path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z"/></>,
+  palette:  <><path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.6-.8 1.6-1.6 0-.6-.4-1-.4-1.6 0-.9.7-1.5 1.6-1.5H17a4 4 0 0 0 4-4C21 6.7 17 3 12 3z"/><path d="M7.5 11h.01M10 7.5h.01M14.5 7.5h.01"/></>,
+  sun:      <><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></>,
+  lock:     <><rect x="4" y="10.5" width="16" height="10.5" rx="2.5"/><path d="M8 10.5v-3a4 4 0 0 1 8 0v3"/></>,
+  key:      <><circle cx="8" cy="15" r="4"/><path d="m11 12 9-9M16 7l3 3"/></>,
+  briefcase:<><rect x="3" y="7" width="18" height="13" rx="2.5"/><path d="M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7M3 13h18"/></>,
+  heart:    <><path d="M12 20s-8-4.6-8-10.5A4.5 4.5 0 0 1 12 7a4.5 4.5 0 0 1 8 2.5C20 15.4 12 20 12 20z"/></>,
+  camera:   <><path d="M4 8h3l1.5-2.5h7L17 8h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.5"/></>,
+  megaphone:<><path d="M3 11v3a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a8 8 0 0 1 0 11"/></>,
+  trend:    <><path d="m3 17 6-6 4 4 8-8"/><path d="M15 7h6v6"/></>,
+  pin:      <><path d="M12 17v5M8 3h8l-1 6 3 3H6l3-3z"/></>,
+  eye:      <><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></>,
+  alert:    <><path d="M12 3 2 20h20z"/><path d="M12 10v4.5M12 17.5h.01"/></>,
+};
+// emoji → όνομα εικονιδίου (για τις κάρτες στατιστικών)
+const EMOJI_ICON = { "👑":"shield", "📋":"clipboard", "👩‍🏫":"users", "👪":"users", "👶":"smile", "✓":"check", "€":"euro", "✉":"mail", "🚌":"bus", "⏳":"clock", "%":"percent" };
+function Ico({n, s=18, sw=1.75}) {
+  return (
+    <svg className="ico" width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{ICON_PATHS[n]}</svg>
+  );
+}
+
 function StatCard({icon, bg, value, label, trend, up}) {
+  const nm = EMOJI_ICON[icon];
   return (
     <div className="stat-card">
-      <div className="stat-ico" style={{background:bg}}>{icon}</div>
+      <div className="stat-ico" style={{background:bg}}>{nm ? <Ico n={nm} s={21}/> : icon}</div>
       <div className="stat-val">{value}</div>
       <div className="stat-lbl">{label}</div>
       {trend && <div className={`stat-trend ${up?"trend-up":"trend-dn"}`}>{trend}</div>}
@@ -664,7 +840,7 @@ function Login({onLogin, users}) {
           <h1>Ονειροχώρα</h1>
           <p>«Η κάθε μέρα του παιδιού δεν γυρνάει πίσω.»</p>
         </div>
-        {err && <div className="lerr">⚠️ {err}</div>}
+        {err && <div className="lerr"><Ico n="alert" s={16}/>{err}</div>}
         <div className="lfield"><label>Όνομα χρήστη</label><input value={u} onChange={e=>setU(e.target.value)} onKeyDown={e=>e.key==="Enter"&&go()} placeholder="username"/></div>
         <div className="lfield"><label>Κωδικός</label><input type="password" value={p} onChange={e=>setP(e.target.value)} onKeyDown={e=>e.key==="Enter"&&go()} placeholder="••••••••"/></div>
         <div onClick={()=>setRemember(!remember)} style={{display:"flex",alignItems:"center",gap:10,cursor:"pointer",marginBottom:18,userSelect:"none"}}>
@@ -758,10 +934,10 @@ function GlobalSearch({kids, setPage, inline=false}) {
     // Dashboard hero version
     return (
       <div className="dash-search-hero">
-        <h2>🔍 Γρήγορη Αναζήτηση</h2>
+        <h2><Ico n="search" s={16}/>Γρήγορη Αναζήτηση</h2>
         <p>Αναζήτηση σε παιδιά, γονείς, τηλέφωνα, ΑΦΜ, διευθύνσεις...</p>
         <div className="dash-search-bar" style={{position:"relative"}}>
-          <span className="dash-search-ico">🔍</span>
+          <span className="dash-search-ico"><Ico n="search" s={19}/></span>
           <input
             ref={inputRef}
             value={q}
@@ -813,7 +989,7 @@ function GlobalSearch({kids, setPage, inline=false}) {
   // Topbar compact version
   return (
     <div className="gsearch-wrap">
-      <span className="gsearch-ico">🔍</span>
+      <span className="gsearch-ico"><Ico n="search" s={16}/></span>
       <input
         className="gsearch-input"
         value={q}
@@ -1044,7 +1220,7 @@ function Xristes({users, setUsers, currentUser}) {
                 {u.tmima && <span className="badge b-earth" style={{fontSize:10}}>{u.tmima}</span>}
               </div>
               <div style={{fontSize:12,color:"var(--text3)",marginTop:3,display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}>
-                <span>👤 {u.username}</span>
+                <span><Ico n="user" s={16}/>{u.username}</span>
                 <span style={{display:"flex",alignItems:"center",gap:5}}>
                   🔑 {showPass[u.id] ? u.password : "••••••••"}
                   <button onClick={()=>togglePass(u.id)} style={{background:"none",border:"none",cursor:"pointer",fontSize:11,color:"var(--green)",fontWeight:600,padding:0}}>
@@ -1224,7 +1400,7 @@ function Dashboard({user, kids, setPage}) {
       )}
 
       <div className="stats-row">
-        <StatCard icon="👶" bg="#E8F4E8" value={kids.length} label="Σύνολο παιδιών" trend="+2 αυτόν τον μήνα" up/>
+        <StatCard icon="👶" bg="#E8F4E8" value={kids.length} label="Σύνολο παιδιών"/>
         <StatCard icon="✓" bg="#ECFDF5" value={pres} label="Παρόντες σήμερα" trend={kids.length?Math.round(pres/kids.length*100)+"%":"—"} up/>
         <StatCard icon="€" bg="#FFFBEB" value={pend} label="Εκκρεμείς πληρωμές" trend={pend>5?"Χρειάζεται προσοχή":""} up={false}/>
         <div onClick={()=>setPage("epikoinonia")} style={{cursor:"pointer"}}>
@@ -1252,7 +1428,7 @@ function Dashboard({user, kids, setPage}) {
 
       <div className="g2">
         <div className="card">
-          <div className="card-title">🚌 Δρομολόγια σήμερα</div>
+          <div className="card-title"><Ico n="bus" s={16}/>Δρομολόγια σήμερα</div>
           {ROUTES.map(r=>(
             <div key={r.id} className="route-item">
               <div className="route-ico" style={{background:r.status==="active"?"#ECFDF5":"#FFFBEB"}}>{r.status==="active"?"🚌":"⏳"}</div>
@@ -1272,7 +1448,7 @@ function Dashboard({user, kids, setPage}) {
         </div>
 
         <div className="card">
-          <div className="card-title">📅 Σήμερα & Επόμενα</div>
+          <div className="card-title"><Ico n="calendar" s={16}/>Σήμερα & Επόμενα</div>
           {today_events.length===0 && <div style={{fontSize:13,color:"var(--text3)",padding:"8px 0"}}>Δεν υπάρχουν εκδηλώσεις σήμερα</div>}
           {EVENTS.slice(0,4).map(e=>(
             <div key={e.id} style={{display:"flex",alignItems:"center",gap:11,padding:"10px 0",borderBottom:"1px solid var(--beige3)"}}>
@@ -1596,7 +1772,7 @@ function Paidia({user, kids, setKids}) {
             {/* ── STEP 1: ΣΤΟΙΧΕΙΑ ΠΑΙΔΙΟΥ ── */}
             {addStep===1&&(
               <div>
-                <div className="section-hd">👶 Στοιχεία Μαθητή/Μαθήτριας</div>
+                <div className="section-hd"><Ico n="smile" s={16}/>Στοιχεία Μαθητή/Μαθήτριας</div>
                 <div className="f2">
                   <div className="fgroup">
                     <label className="flabel">Ονοματεπώνυμο παιδιού *</label>
@@ -1620,7 +1796,7 @@ function Paidia({user, kids, setKids}) {
                   </div>
                 </div>
 
-                <div className="section-hd">📍 Τόπος Κατοικίας</div>
+                <div className="section-hd"><Ico n="mappin" s={16}/>Τόπος Κατοικίας</div>
                 <div className="form-grid-4" style={{display:"grid",gridTemplateColumns:"2fr 2fr 1fr 1fr",gap:10}}>
                   <div className="fgroup">
                     <label className="flabel">Τόπος κατοικίας</label>
@@ -1640,7 +1816,7 @@ function Paidia({user, kids, setKids}) {
                   </div>
                 </div>
 
-                <div className="section-hd">🚌 Μεταφορά με Σχολικό</div>
+                <div className="section-hd"><Ico n="bus" s={16}/>Μεταφορά με Σχολικό</div>
                 <div style={{display:"flex",gap:10,marginBottom:14}}>
                   {[["yes","✓ ΝΑΙ"],["no","✕ ΟΧΙ"]].map(([v,l])=>(
                     <button key={v} onClick={()=>f("scholiko",v)}
@@ -1662,7 +1838,7 @@ function Paidia({user, kids, setKids}) {
                   </div>
                 )}
 
-                <div className="section-hd">🍽️ Μεσημεριανό</div>
+                <div className="section-hd"><Ico n="utensils" s={16}/>Μεσημεριανό</div>
                 <div style={{display:"flex",gap:10,marginBottom:6}}>
                   {[["yes","Επιθυμώ σίτιση"],["no","Δεν επιθυμώ σίτιση"]].map(([v,l])=>(
                     <button key={v} onClick={()=>f("mesimeri",v)}
@@ -1678,7 +1854,7 @@ function Paidia({user, kids, setKids}) {
             {/* ── STEP 2: ΟΙΚΟΓΕΝΕΙΑ ── */}
             {addStep===2&&(
               <div>
-                <div className="section-hd">👨 Στοιχεία Πατέρα</div>
+                <div className="section-hd"><Ico n="user" s={16}/>Στοιχεία Πατέρα</div>
                 <div className="f2">
                   <div className="fgroup">
                     <label className="flabel">Ονοματεπώνυμο Πατέρα *</label>
@@ -1700,7 +1876,7 @@ function Paidia({user, kids, setKids}) {
                   </div>
                 </div>
 
-                <div className="section-hd">👩 Στοιχεία Μητέρας</div>
+                <div className="section-hd"><Ico n="user" s={16}/>Στοιχεία Μητέρας</div>
                 <div className="f2">
                   <div className="fgroup">
                     <label className="flabel">Ονοματεπώνυμο Μητέρας *</label>
@@ -1744,7 +1920,7 @@ function Paidia({user, kids, setKids}) {
                   </div>
                 </div>
 
-                <div className="section-hd">👤 Άλλα άτομα επικοινωνίας</div>
+                <div className="section-hd"><Ico n="user" s={16}/>Άλλα άτομα επικοινωνίας</div>
                 {[[1,"ep1"],[2,"ep2"],[3,"ep3"],[4,"ep4"]].map(([n,k])=>(
                   <div key={k} className="f2" style={{marginBottom:4}}>
                     <div className="fgroup" style={{marginBottom:8}}>
@@ -1763,7 +1939,7 @@ function Paidia({user, kids, setKids}) {
             {/* ── STEP 3: ΙΑΤΡΙΚΟ & ΛΟΙΠΑ ── */}
             {addStep===3&&(
               <div>
-                <div className="section-hd">🏥 Ιατρικό Ιστορικό</div>
+                <div className="section-hd"><Ico n="heart" s={16}/>Ιατρικό Ιστορικό</div>
                 <div style={{background:"var(--beige)",borderRadius:12,padding:"12px 14px",marginBottom:12,fontSize:13,color:"var(--text2)"}}>
                   Αν υπάρχει κάποιο θέμα υγείας (π.χ. αλλεργία) να καταγραφεί, ή <strong>«ΟΥΔΕΝ»</strong> αν δεν υπάρχει.
                 </div>
@@ -1773,7 +1949,7 @@ function Paidia({user, kids, setKids}) {
                     placeholder="π.χ. Αλλεργία στη γλουτένη — απαγορεύεται η κατανάλωση ψωμιού, ζυμαρικών&#10;ή γράψτε: ΟΥΔΕΝ"/>
                 </div>
 
-                <div className="section-hd">🔑 Portal Γονέα (Πρόσβαση στην εφαρμογή)</div>
+                <div className="section-hd"><Ico n="key" s={16}/>Portal Γονέα (Πρόσβαση στην εφαρμογή)</div>
                 <div className="f2">
                   <div className="fgroup">
                     <label className="flabel">Username γονέα</label>
@@ -1806,7 +1982,7 @@ function Paidia({user, kids, setKids}) {
             {/* ── STEP 4: ΟΙΚΟΝΟΜΙΚΑ ── */}
             {addStep===4&&(
               <div>
-                <div className="section-hd">💼 Οικονομικά Στοιχεία Πατέρα <span style={{color:"var(--burg)",fontSize:11}}>(υποχρεωτική συμπλήρωση)</span></div>
+                <div className="section-hd"><Ico n="briefcase" s={16}/>Οικονομικά Στοιχεία Πατέρα <span style={{color:"var(--burg)",fontSize:11}}>(υποχρεωτική συμπλήρωση)</span></div>
                 <div className="fgroup">
                   <label className="flabel">Ονοματεπώνυμο (όπως στην ταυτότητα) *</label>
                   <input className="finput" value={form.pat_name} onChange={e=>f("pat_name",e.target.value)} placeholder="Ακριβώς όπως αναγράφεται στην ταυτότητα"/>
@@ -1836,7 +2012,7 @@ function Paidia({user, kids, setKids}) {
                   </div>
                 </div>
 
-                <div className="section-hd">💼 Οικονομικά Στοιχεία Μητέρας <span style={{color:"var(--burg)",fontSize:11}}>(υποχρεωτική συμπλήρωση)</span></div>
+                <div className="section-hd"><Ico n="briefcase" s={16}/>Οικονομικά Στοιχεία Μητέρας <span style={{color:"var(--burg)",fontSize:11}}>(υποχρεωτική συμπλήρωση)</span></div>
                 <div className="fgroup">
                   <label className="flabel">Ονοματεπώνυμο (όπως στην ταυτότητα) *</label>
                   <input className="finput" value={form.mit_name} onChange={e=>f("mit_name",e.target.value)} placeholder="Ακριβώς όπως αναγράφεται στην ταυτότητα"/>
@@ -2075,7 +2251,7 @@ function Paidia({user, kids, setKids}) {
 
                 {/* ΠΑΡΑΣΤΑΤΙΚΑ */}
                 <div style={{fontWeight:700,fontSize:12,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".05em",padding:"8px 0 10px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-                  <span>📄 Παραστατικά</span>
+                  <span><Ico n="filetext" s={16}/>Παραστατικά</span>
                   <button
                     onClick={()=>window.open("https://www.prosvasisgo.gr","_blank")}
                     style={{display:"flex",alignItems:"center",gap:6,background:"#1A3A6E",color:"#fff",border:"none",borderRadius:8,padding:"5px 12px",fontSize:11,fontWeight:700,cursor:"pointer",letterSpacing:".02em"}}>
@@ -2330,7 +2506,7 @@ function Deltion({user, kids, setKids}) {
             <div className="modal-title">📝 Δελτίο — {sk.name}<button className="modal-close" onClick={()=>setSk(null)}>✕</button></div>
             <div style={{fontSize:12,color:"var(--text3)",marginBottom:16}}>📅 {todayGR}</div>
 
-            <div className="section-hd">🍽️ Φαγητό</div>
+            <div className="section-hd"><Ico n="utensils" s={16}/>Φαγητό</div>
             {[["prwino","Πρωινό 🌅"],["mesimeri","Μεσημεριανό ☀️"],["apogeyma","Απογευματινό 🌇"]].map(([k,l])=>(
               <div key={k} style={{marginBottom:14}}>
                 <div style={{fontSize:12,fontWeight:600,color:"var(--text2)",marginBottom:7}}>{l}</div>
@@ -2338,10 +2514,10 @@ function Deltion({user, kids, setKids}) {
               </div>
             ))}
 
-            <div className="section-hd">😴 Ύπνος</div>
+            <div className="section-hd"><Ico n="moon" s={16}/>Ύπνος</div>
             <div className="pill-row" style={{marginBottom:16}}>{SLEEP_OPTS.map(o=><div key={o} className={`pill ${form.ypnos===o?"sel":""}`} onClick={()=>setForm({...form,ypnos:o})}>{o}</div>)}</div>
 
-            <div className="section-hd">🎨 Δραστηριότητα · Προαύλιο</div>
+            <div className="section-hd"><Ico n="palette" s={16}/>Δραστηριότητα · Προαύλιο</div>
             <div style={{display:"flex",flexDirection:"column",gap:12,marginBottom:16}}>
               <div style={{display:"flex",alignItems:"center",gap:12,padding:"10px 14px",background:"var(--beige)",borderRadius:10}}>
                 <span style={{fontSize:13,fontWeight:600,color:"var(--text2)",width:180,flexShrink:0}}>🎨 Δραστηριότητα</span>
@@ -2357,10 +2533,10 @@ function Deltion({user, kids, setKids}) {
             <div className="section-hd" style={{marginTop:4}}>😊 Διάθεση παιδιού</div>
             <div className="pill-row" style={{marginBottom:16}}>{MOOD_OPTS.map(o=><div key={o} className={`pill ${form.mood===o?"sel":""}`} onClick={()=>setForm({...form,mood:o})}>{o}</div>)}</div>
 
-            <div className="section-hd">📌 Σημειώσεις</div>
+            <div className="section-hd"><Ico n="pin" s={16}/>Σημειώσεις</div>
             <textarea className="finput" rows={4} placeholder="π.χ. Τελειώνουν οι πάνες, Καλή διάθεση σήμερα, Έχει κρυολόγημα..." value={form.notes} onChange={e=>setForm({...form,notes:e.target.value})} style={{marginBottom:16,resize:"vertical",width:"100%"}}/>
 
-            <div className="section-hd">📸 Φωτογραφίες & Βίντεο</div>
+            <div className="section-hd"><Ico n="camera" s={16}/>Φωτογραφίες & Βίντεο</div>
             <div className="media-drop" onClick={()=>fr.current.click()}>
               <div style={{fontSize:28,marginBottom:6}}>📷</div>
               <div style={{fontWeight:600,fontSize:13}}>Κλικ για ανέβασμα</div>
@@ -2605,13 +2781,13 @@ function Calendar({user}) {
             </div>
             <div className="fgroup"><label className="flabel">Περιγραφή</label><textarea className="finput" rows={3} value={ne.desc} onChange={e=>setNe({...ne,desc:e.target.value})}/></div>
             <div className="fgroup">
-              <label className="flabel">👤 Καταχωρήθηκε από</label>
+              <label className="flabel"><Ico n="user" s={16}/>Καταχωρήθηκε από</label>
               <input className="finput" value={ne.author} onChange={e=>setNe({...ne,author:e.target.value})} placeholder="π.χ. Διοίκηση — Πέτρος, Τζο, Γιώτα"/>
             </div>
 
             {/* VISIBILITY */}
             <div className="fgroup">
-              <label className="flabel">👁️ Ποιος βλέπει αυτό το γεγονός; *</label>
+              <label className="flabel"><Ico n="eye" s={16}/>Ποιος βλέπει αυτό το γεγονός; *</label>
               <div style={{display:"flex",flexDirection:"column",gap:7,marginTop:4}}>
                 {[
                   {val:"all",    label:"📢 Όλοι (γονείς + προσωπικό)", desc:"Εμφανίζεται σε όλους"},
@@ -2839,7 +3015,7 @@ function Epikoinonia({user, onNewParentMsg}) {
       {tab==="inbox"&&(user.role==="admin"||user.role==="secretary")&&(
       <div className="card">
         {msgs.map(m=>(
-          <div key={m.id} style={{padding:"14px 16px",borderRadius:12,border:`1.5px solid ${nc[m.type]||"var(--beige3)"}`,marginBottom:9,background:nc[m.type]||"var(--white)",cursor:"pointer"}}>
+          <div key={m.id} style={{padding:"14px 16px",borderRadius:12,border:`1.5px solid ${nc[m.type]||"var(--beige3)"}`,marginBottom:9,background:nc[m.type]||"var(--white)"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
               <div style={{display:"flex",alignItems:"center",gap:8}}>
                 <span style={{fontSize:16}}>{ni[m.type]||"📢"}</span>
@@ -2945,18 +3121,18 @@ function ParentPortal({user, kids}) {
               ))}
             </div>
             <div className="report-block" style={{marginBottom:10}}>
-              <div className="report-key">🎨 Δραστηριότητα</div>
+              <div className="report-key"><Ico n="palette" s={16}/>Δραστηριότητα</div>
               <div className="report-val"><span style={{fontSize:22}}>{rep.drastiriotita?"✅":"❌"}</span>{rep.drastiriotita?"Συμμετείχε κανονικά":"Δεν συμμετείχε"}</div>
             </div>
             <div className="report-block" style={{marginBottom:10}}>
-              <div className="report-key">🌤️ Προαύλιο</div>
+              <div className="report-key"><Ico n="sun" s={16}/>Προαύλιο</div>
               <div className="report-val"><span style={{fontSize:22}}>{rep.proaulismos?"✅":"❌"}</span>{rep.proaulismos?"Βγήκε στο προαύλιο":"Δεν βγήκε στο προαύλιο"}</div>
             </div>
             <div className="report-block" style={{marginBottom:10}}>
-              <div className="report-key">😊 Διάθεση</div>
+              <div className="report-key"><Ico n="smile" s={16}/>Διάθεση</div>
               <div className="report-val">{rep.mood||"—"}</div>
             </div>
-            {rep.notes&&<div className="report-block highlight"><div className="report-key">📌 Σημειώσεις δασκάλας</div><div style={{fontSize:14,fontWeight:500,color:"var(--green)"}}>{rep.notes}</div></div>}
+            {rep.notes&&<div className="report-block highlight"><div className="report-key"><Ico n="pin" s={16}/>Σημειώσεις δασκάλας</div><div style={{fontSize:14,fontWeight:500,color:"var(--green)"}}>{rep.notes}</div></div>}
             {(rep.media||[]).length>0&&(
               <div>
                 <div style={{fontSize:12,fontWeight:600,color:"var(--text3)",margin:"14px 0 8px",textTransform:"uppercase",letterSpacing:".05em"}}>📸 Φωτογραφίες</div>
@@ -3334,7 +3510,7 @@ function Dromologia() {
         <StatCard icon="⏳" bg="#FFFBEB" value={routes.filter(r=>r.status==="delayed").length} label="Καθυστερήσεις"/>
       </div>
       <div className="card" style={{marginBottom:16}}>
-        <div className="card-title">🚌 Ενεργά δρομολόγια</div>
+        <div className="card-title"><Ico n="bus" s={16}/>Ενεργά δρομολόγια</div>
         {routes.length===0 && (
           <div style={{textAlign:"center",padding:"28px 16px",color:"var(--text3)"}}>
             <div style={{fontSize:30,marginBottom:8}}>🚌</div>
@@ -3359,7 +3535,7 @@ function Dromologia() {
         <button className="btn btn-primary btn-sm" style={{marginTop:12}} onClick={()=>setShowAdd(true)}>+ Νέο δρομολόγιο</button>
       </div>
       <div className="card">
-        <div className="card-title">📢 Ειδοποίηση αλλαγής δρομολογίου</div>
+        <div className="card-title"><Ico n="megaphone" s={16}/>Ειδοποίηση αλλαγής δρομολογίου</div>
         <textarea className="finput" rows={3} placeholder="π.χ. Αύριο το δρομολόγιο Β καθυστερεί 15 λεπτά..." style={{marginBottom:10}} value={notifText} onChange={e=>setNotifText(e.target.value)}/>
         <button className="btn btn-primary" onClick={sendNotif}>🚨 Αποστολή σε όλους τους γονείς</button>
       </div>
@@ -3559,7 +3735,7 @@ function Oikonomika({user, kids, setKids}) {
           {/* Category breakdown */}
           {catSummary.length>0&&(
             <div className="card" style={{marginTop:16}}>
-              <div className="card-title">📊 Ανάλυση ανά κατηγορία</div>
+              <div className="card-title"><Ico n="chart" s={16}/>Ανάλυση ανά κατηγορία</div>
               <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:10}}>
                 {catSummary.map(c=>(
                   <div key={c.cat} style={{padding:"12px 14px",background:"var(--beige)",borderRadius:12,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
@@ -3609,7 +3785,7 @@ function Oikonomika({user, kids, setKids}) {
       {/* ── ΣΥΝΟΛΑ (admin only) ── */}
       {oikTab==="synolo"&&user.role==="admin"&&(
         <div className="card">
-          <div className="card-title">📈 Ετήσια σύνοψη 2025-26</div>
+          <div className="card-title"><Ico n="trend" s={16}/>Ετήσια σύνοψη 2025-26</div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:12,marginBottom:20}}>
             {MONTHS.map(m=>{
               const mEx=exoda.filter(e=>e.month===m.val).reduce((s,e)=>s+Number(e.poso),0);
@@ -3668,11 +3844,11 @@ function Anafores({kids}) {
       </div>
       <div className="g2">
         <div className="card">
-          <div className="card-title">👶 Παρουσίες ανά τμήμα</div>
+          <div className="card-title"><Ico n="smile" s={16}/>Παρουσίες ανά τμήμα</div>
           {TMIMATA.map(t=>{const tk=kids.filter(c=>c.tmima===t.id);const pr=tk.filter(c=>c.present).length;const pct=tk.length?Math.round(pr/tk.length*100):0;return(<div key={t.id} style={{marginBottom:14}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}><span style={{fontWeight:600,fontSize:13}}>{t.name}</span><span style={{fontSize:12,color:"var(--text3)"}}>{pr}/{tk.length} ({pct}%)</span></div><div className="pbar" style={{height:7}}><div className="pbar-fill" style={{width:`${pct}%`,background:t.color}}/></div></div>);})}
         </div>
         <div className="card">
-          <div className="card-title">💰 Δίδακτρα ανά τμήμα</div>
+          <div className="card-title"><Ico n="euro" s={16}/>Δίδακτρα ανά τμήμα</div>
           {TMIMATA.map(t=>{const tk=kids.filter(c=>c.tmima===t.id);const pa=tk.filter(c=>c.didaktra==="paid").length;const pct=tk.length?Math.round(pa/tk.length*100):0;return(<div key={t.id} style={{marginBottom:14}}><div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}><span style={{fontWeight:600,fontSize:13}}>{t.name}</span><span style={{fontSize:12,color:"var(--text3)"}}>{pa}/{tk.length}</span></div><div className="pbar" style={{height:7}}><div className="pbar-fill" style={{width:`${pct}%`,background:pct>70?"#34D399":"#FCD34D"}}/></div></div>);})}
           <div style={{marginTop:16,padding:14,background:"var(--green3)",borderRadius:12,textAlign:"center"}}>
             <div style={{fontFamily:"Playfair Display,serif",fontSize:24,fontWeight:700,color:"var(--green)"}}>{rev}€</div>
@@ -3694,7 +3870,7 @@ function Programma() {
   return (
     <div className="page-in">
       <div className="card" style={{marginBottom:20}}>
-        <div className="card-title">📅 Εβδομαδιαίο πρόγραμμα</div>
+        <div className="card-title"><Ico n="calendar" s={16}/>Εβδομαδιαίο πρόγραμμα</div>
         <div className="prog-grid" style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:10}}>
           {Object.entries(PROG).map(([day,items])=>(
             <div key={day} style={{background:"var(--beige)",borderRadius:12,padding:13}}>
@@ -3712,7 +3888,7 @@ function Programma() {
 export default function App() {
   const [user,setUser] = useState(null);
   const [page,setPage] = useState("dashboard");
-  const [sbCollapsed, setSbCollapsed] = useState(false);
+  const [sbCollapsed, setSbCollapsed] = useState(()=>{ try { return window.innerWidth<=820; } catch { return false; } });
 
   // Auto-collapse sidebar on small screens
   useEffect(()=>{
@@ -3737,6 +3913,14 @@ export default function App() {
   }, []);
   const [kids,setKids] = useState(KIDS0);
   const [users,setUsers] = useState(USERS);
+  // Οι γονείς που καταχωρήθηκαν στο Μητρώο (με όνομα χρήστη/κωδικό) μπορούν να συνδεθούν
+  const allUsers = [
+    ...users,
+    ...kids.filter(k=>k.parent_username && k.parent_password && !users.some(u=>u.username===k.parent_username)).map(k=>{
+      const nm = k.mit_name || k.pat_name || "Γονέας";
+      return { id:"kid-"+k.id, username:k.parent_username, password:k.parent_password, role:"parent", name:nm, initials:nm.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase(), child_id:k.id };
+    }),
+  ];
   const [pushNotifs, setPushNotifs] = useState([]);
   const [showNotifPanel, setShowNotifPanel] = useState(false);
   const [ptMsgsForPanel, setPtMsgsForPanel] = useState(PT_MESSAGES.list);
@@ -3790,7 +3974,7 @@ export default function App() {
   if(!user) return (
     <>
       <style>{CSS}</style>
-      <Login users={users} onLogin={u=>{ setUser(u); setPage(u.role==="parent"?"parent_portal":"dashboard"); }}/>
+      <Login users={allUsers} onLogin={u=>{ setUser(u); setPage(u.role==="parent"?"parent_portal":"dashboard"); }}/>
     </>
   );
 
@@ -3801,28 +3985,28 @@ export default function App() {
         <div className="topbar">
           <div className="topbar-l"><h1>Ονειροχώρα</h1><p>Καλωσήρθατε, {user.name}</p></div>
           <div className="topbar-r">
-            <span className="top-date">📅 {new Date().toLocaleDateString("el-GR")}</span>
-            <button className="sb-logout" style={{width:"auto",padding:"7px 14px",background:"var(--beige2)",color:"var(--text2)",border:"1px solid var(--beige3)"}} onClick={logout}>Έξοδος</button>
+            <span className="top-date"><Ico n="calendar" s={14}/>{new Date().toLocaleDateString("el-GR")}</span>
+            <button className="sb-logout" style={{width:"auto",padding:"8px 16px",background:"#fff",color:"var(--text2)",border:"1px solid var(--beige3)"}} onClick={logout}><Ico n="logout" s={16}/>Έξοδος</button>
           </div>
         </div>
-        <div style={{flex:1,overflowY:"auto",padding:28}}><ParentPortal user={user} kids={kids}/></div>
+        <div className="parent-content"><ParentPortal user={user} kids={kids}/></div>
       </div>
     </>
   );
 
   const NAV = [
-    { key:"dashboard",    ico:"⌂",  label:"Αρχική",             roles:["admin","secretary","teacher"] },
-    { key:"mitroo",       ico:"📋",  label:"Μητρώο",              roles:["admin","secretary","teacher"] },
-    { key:"parousies",    ico:"✓",   label:"Παρουσίες",           roles:["admin","secretary","teacher"] },
-    { key:"deltion",      ico:"📝",  label:"Ημερήσιο Δελτίο",    roles:["teacher","admin"] },
-    { key:"gallery",      ico:"📸",  label:"Gallery",             roles:["admin","secretary","teacher"] },
-    { key:"epikoinonia",  ico:"✉",   label:"Επικοινωνία",         roles:["admin","secretary","teacher"] },
-    { key:"calendar",     ico:"📅",  label:"Ημερολόγιο",          roles:["admin","secretary","teacher"] },
-    { key:"dromologia",   ico:"🚌",  label:"Δρομολόγια",          roles:["admin","secretary"] },
-    { key:"oikonomika",   ico:"€",   label:"Οικονομικά",          roles:["admin","secretary"] },
-    { key:"programma",    ico:"📋",  label:"Πρόγραμμα",           roles:["admin","secretary","teacher"] },
-    { key:"anafores",     ico:"📊",  label:"Αναφορές",            roles:["admin","secretary"] },
-    { key:"xristes",      ico:"👥",  label:"Χρήστες",              roles:["admin"] },
+    { key:"dashboard",    ico:"home",  label:"Αρχική",             roles:["admin","secretary","teacher"] },
+    { key:"mitroo",       ico:"clipboard",  label:"Μητρώο",              roles:["admin","secretary","teacher"] },
+    { key:"parousies",    ico:"check",   label:"Παρουσίες",           roles:["admin","secretary","teacher"] },
+    { key:"deltion",      ico:"filetext",  label:"Ημερήσιο Δελτίο",    roles:["teacher","admin"] },
+    { key:"gallery",      ico:"image",  label:"Gallery",             roles:["admin","secretary","teacher"] },
+    { key:"epikoinonia",  ico:"message",   label:"Επικοινωνία",         roles:["admin","secretary","teacher"] },
+    { key:"calendar",     ico:"calendar",  label:"Ημερολόγιο",          roles:["admin","secretary","teacher"] },
+    { key:"dromologia",   ico:"bus",  label:"Δρομολόγια",          roles:["admin","secretary"] },
+    { key:"oikonomika",   ico:"euro",   label:"Οικονομικά",          roles:["admin","secretary"] },
+    { key:"programma",    ico:"grid",  label:"Πρόγραμμα",           roles:["admin","secretary","teacher"] },
+    { key:"anafores",     ico:"chart",  label:"Αναφορές",            roles:["admin","secretary"] },
+    { key:"xristes",      ico:"users",  label:"Χρήστες",              roles:["admin"] },
   ];
 
   const TITLES = {
@@ -3854,8 +4038,8 @@ export default function App() {
         {!sbCollapsed && <div className="mobile-overlay" onClick={()=>setSbCollapsed(true)}/>}
         {/* SIDEBAR */}
         <div className={`sidebar ${sbCollapsed?"collapsed":""}`}>
-          <button className="sb-toggle" onClick={()=>setSbCollapsed(!sbCollapsed)} title={sbCollapsed?"Άνοιγμα μενού":"Σύμπτυξη μενού"}>
-            {sbCollapsed?"›":"‹"}
+          <button className="sb-toggle" onClick={()=>setSbCollapsed(!sbCollapsed)} title={sbCollapsed?"Άνοιγμα μενού":"Σύμπτυξη μενού"} aria-label="Εναλλαγή μενού">
+            <Ico n={sbCollapsed?"chevR":"chevL"} s={14} sw={2.4}/>
           </button>
           <div className="sb-head">
             <div className="sb-brand">
@@ -3872,40 +4056,40 @@ export default function App() {
           <nav className="sb-nav">
             <div className="sb-section">Κύριο Μενού</div>
             {visNav.map(item=>(
-              <div key={item.key} className={`nav-item ${page===item.key?"active":""}`} onClick={()=>{setPage(item.key); if(window.innerWidth<=820) setSbCollapsed(true);}} title={item.label}>
-                <span className="nav-ico">{item.ico}</span>
+              <div key={item.key} role="button" tabIndex={0} className={`nav-item ${page===item.key?"active":""}`} onClick={()=>{setPage(item.key); if(window.innerWidth<=820) setSbCollapsed(true);}} onKeyDown={e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); setPage(item.key); if(window.innerWidth<=820) setSbCollapsed(true);} }} title={item.label}>
+                <span className="nav-ico"><Ico n={item.ico} s={19}/></span>
                 <span className="nav-label">{item.label}</span>
                 {item.badge?<span className="nav-badge">{item.badge}</span>:null}
               </div>
             ))}
-            {user.role==="admin"&&(<>
-              <div className="sb-section" style={{marginTop:8}}>Σύστημα</div>
-              <div className="nav-item" title="Ρυθμίσεις"><span className="nav-ico">⚙</span><span className="nav-label">Ρυθμίσεις</span></div>
-            </>)}
           </nav>
-          <div className="sb-foot"><button className="sb-logout" onClick={logout} title="Αποσύνδεση"><span className="nav-ico" style={{display:"inline"}}>🚪</span> <span>Αποσύνδεση</span></button></div>
+          <div className="sb-foot"><button className="sb-logout" onClick={logout} title="Αποσύνδεση"><Ico n="logout" s={17}/><span className="sb-logout-label">Αποσύνδεση</span></button></div>
         </div>
 
         {/* MAIN */}
         <div className="main">
           <div className="topbar">
-            <div className="topbar-l">
-              <h1>{TITLES[page]}</h1>
-              <p>{SUBS[page]}</p>
+            <div className="topbar-lw">
+              <button className="mobile-menu-btn" onClick={()=>setSbCollapsed(false)} aria-label="Άνοιγμα μενού" title="Μενού"><Ico n="menu" s={21}/></button>
+              <div className="topbar-l">
+                <h1>{TITLES[page]}</h1>
+                <p>{SUBS[page]}</p>
+              </div>
             </div>
             <div className="topbar-r">
+              {DEMO && <span className="demo-chip" title="Δοκιμαστικά δεδομένα — δεν είναι πραγματικά παιδιά">ΔΟΚΙΜΑΣΤΙΚΑ</span>}
               <GlobalSearch kids={kids} setPage={setPage}/>
-              <span className="top-date">📅 {new Date().toLocaleDateString("el-GR")}</span>
+              <span className="top-date"><Ico n="calendar" s={14}/>{new Date().toLocaleDateString("el-GR")}</span>
               <div style={{position:"relative"}}>
                 <button className="top-notif" title="Ειδοποιήσεις" onClick={()=>setShowNotifPanel(!showNotifPanel)}>
-                  🔔{unreadPtCount>0 && <span className="notif-dot"/>}
+                  <Ico n="bell" s={19}/>{unreadPtCount>0 && <span className="notif-dot"/>}
                 </button>
                 {showNotifPanel && (
                   <>
                     <div className="gsearch-overlay" onClick={()=>setShowNotifPanel(false)}/>
                     <div className="gsearch-results" style={{width:360}}>
                       <div className="gsr-header" style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                        <span>🔔 Ειδοποιήσεις</span>
+                        <span><Ico n="bell" s={16}/>Ειδοποιήσεις</span>
                         {unreadPtCount>0 && <span className="badge b-red" style={{fontSize:10}}>{unreadPtCount} νέα</span>}
                       </div>
                       {(user.role==="admin"||user.role==="secretary"||user.role==="teacher") && recentPtMsgs.length>0 ? (
