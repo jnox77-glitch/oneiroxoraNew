@@ -4720,8 +4720,10 @@ export default function App() {
       if(dirty.current){ clearTimeout(flushTimer.current); flushTimer.current = setTimeout(runFlush, 300); }
     }
   };
+  const editSeq = useRef(0);   // μετράει τις τοπικές αλλαγές· αν μια ανανέωση από τη βάση «πιάσει» αλλαγή στη μέση, πετιέται (ώστε να μην επιστρέψει παλιά τιμή)
   const setKids = (next) => {
     const val = typeof next==="function" ? next(kidsRef.current) : next;
+    editSeq.current++;
     kidsRef.current = val; setKidsState(val);
     if(sb && roleRef.current && roleRef.current!=="parent"){
       dirty.current = true; setSyncState("saving");
@@ -4730,9 +4732,10 @@ export default function App() {
   };
   const reloadKids = async () => {
     if(!sb || !roleRef.current || flushing.current || dirty.current) return;
+    const seq = editSeq.current;
     try {
       const r = await sbLoadKids(roleRef.current);
-      if(flushing.current || dirty.current) return;
+      if(flushing.current || dirty.current || seq!==editSeq.current) return;
       kidsRef.current = r.kids; snapRef.current = r.snap; setKidsState(r.kids);
     } catch(e) { console.error(e); }
   };
