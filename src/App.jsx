@@ -25,13 +25,19 @@ const DEFAULT_STAFF = [
 
 
 
-const TMIMATA = [
-  { id:"vr-a", name:"Βρεφικό Α", type:"vrefiko", capacity:12, teacher:"Μαρία Παπαδοπούλου", color:"#7CB9A0" },
-  { id:"vr-b", name:"Βρεφικό Β", type:"vrefiko", capacity:12, teacher:"Ελένη Γεωργίου",     color:"#9BBDD4" },
-  { id:"vr-c", name:"Βρεφικό Γ", type:"vrefiko", capacity:12, teacher:"Σοφία Νικολάου",     color:"#C4A882" },
-  { id:"pa-a", name:"Παιδικό Α", type:"paidiko", capacity:20, teacher:"Άννα Κωστοπούλου",   color:"#A8C5A0" },
-  { id:"pa-b", name:"Παιδικό Β", type:"paidiko", capacity:20, teacher:"Δήμητρα Αλεξίου",    color:"#C9B8A8" },
+// Τα τμήματα φορτώνονται από τη βάση (πίνακας «tmimata») και τροποποιούνται από τη σελίδα «Τμήματα».
+// Αυτά εδώ είναι μόνο οι αρχικές τιμές (και για τη δοκιμαστική λειτουργία). Δεν υπάρχει όριο παιδιών.
+const TMIMATA_DEFAULT = [
+  { id:"vr-a", name:"Βρεφικό Α", type:"vrefiko", teacher:"", color:"#7CB9A0", fee:350 },
+  { id:"vr-b", name:"Βρεφικό Β", type:"vrefiko", teacher:"", color:"#9BBDD4", fee:350 },
+  { id:"vr-c", name:"Βρεφικό Γ", type:"vrefiko", teacher:"", color:"#C4A882", fee:350 },
+  { id:"pa-a", name:"Παιδικό Α", type:"paidiko", teacher:"", color:"#A8C5A0", fee:280 },
+  { id:"pa-b", name:"Παιδικό Β", type:"paidiko", teacher:"", color:"#C9B8A8", fee:280 },
 ];
+const TMIMATA = TMIMATA_DEFAULT.map(t=>({...t}));     // ζωντανή λίστα· ενημερώνεται «επί τόπου»
+const TM_STATE = { loaded:false, error:"" };
+const TM_COLORS = ["#7CB9A0","#9BBDD4","#C4A882","#A8C5A0","#C9B8A8","#E0A3A3","#B7A3E0","#E0C46C","#6FB3C9","#D98E73"];
+const tmName = (id) => TMIMATA.find(t=>t.id===id)?.name || "";
 
 const localISO = (d=new Date()) => { const z=n=>String(n).padStart(2,"0"); return `${d.getFullYear()}-${z(d.getMonth()+1)}-${z(d.getDate())}`; };
 const TODAY = localISO();
@@ -102,7 +108,7 @@ function genDemoKids(){
         if(back>0 && rnd()<0.25) return;
         kid.daily_reports.push({
           date: back===0?TODAY:dateOffset(back),
-          prwino:pick(meals), mesimeri:pick(meals), apogeyma:pick(meals), ypnos:pick(sleeps),
+          prwino:pick(meals), mesimeri:pick(meals), apogeyma:pick(meals), ypnos:rnd()<0.85?"Ναι":"Όχι", ypnos_notes:rnd()<0.6?"Κοιμήθηκε "+pick(sleeps.slice(0,6)):"",
           drastiriotita:true, proaulismos:rnd()<0.8, mood:pick(moods), notes:pick(notes), media:[],
         });
       });
@@ -143,12 +149,23 @@ const sb = DEMO ? null : createClient(SB_URL, SB_KEY, { auth:{ persistSession:tr
 
 // Το όνομα χρήστη γίνεται εσωτερικό «email» (δεν στέλνεται ποτέ email)
 const emailOf = (u) => `${String(u||"").trim().toLowerCase()}@oneirochora.app`;
-const toUser = (p) => ({
+// Τα παιδιά ενός γονέα (αδέρφια): child_ids αν υπάρχει, αλλιώς το παλιό child_id
+const childIdsOf = (p) => (Array.isArray(p.child_ids) && p.child_ids.length) ? p.child_ids.map(Number) : (p.child_id==null?[]:[Number(p.child_id)]);
+const toUser = (p) => { const ids = childIdsOf(p); return {
   id:p.id, username:p.username, role:p.role, name:p.name,
   initials:p.initials || (p.name||"?").trim().charAt(0),
-  tmima_id:p.tmima_id||undefined, tmima:TMIMATA.find(t=>t.id===p.tmima_id)?.name,
-  child_id:p.child_id==null?undefined:Number(p.child_id),
-});
+  tmima_id:p.tmima_id||undefined, tmima:tmName(p.tmima_id)||undefined,
+  child_id: ids.length?ids[0]:undefined,
+  child_ids: ids,
+}; };
+
+async function sbLoadTmimata(){
+  const { data, error } = await sb.from("tmimata").select("*").order("sort",{ascending:true}).order("created_at",{ascending:true});
+  if(error){ TM_STATE.error = error.message || String(error); return false; }     // ο πίνακας δεν υπάρχει ακόμα → μένουν τα αρχικά
+  TMIMATA.splice(0, TMIMATA.length, ...data.map(r=>({ id:r.id, name:r.name, type:r.type==="vrefiko"?"vrefiko":"paidiko", teacher:r.teacher||"", color:r.color||"#7CB9A0", fee:Number(r.fee)||0 })));
+  TM_STATE.loaded = true; TM_STATE.error = "";
+  return true;
+}
 
 // Κλήση στη λειτουργία διαχείρισης χρηστών (δημιουργία/αλλαγή/διαγραφή λογαριασμών)
 async function sbAdmin(action, payload){
@@ -269,6 +286,33 @@ const PT_MESSAGES = {
       } else {
         this.list = this.list.map(x=>x.id===tmp.id?data:x); this.notify({ type:"change" });
       }
+    });
+  },
+  // Ένα μήνυμα σε πολλούς γονείς: ένα αντίτυπο ανά παιδί (ώστε κάθε γονέας να βλέπει μόνο το δικό του)
+  addMany(msgs){
+    if(!msgs.length) return Promise.resolve(true);
+    if(!sb){
+      msgs.forEach(msg=>{ this.list = [{ ...msg, id:Date.now()+Math.random() }, ...this.list]; });
+      this.notify({ type:"reset" });
+      return Promise.resolve(true);
+    }
+    const tmps = msgs.map(m=>({ ...m, id:"tmp-"+Date.now()+"-"+Math.random() }));
+    this.list = [...tmps, ...this.list];
+    this.notify({ type:"reset" });
+    const strip = (rows, noBatch) => rows.map(m=>({
+      from_role:m.from_role, from_name:m.from_name, child_id:m.child_id, child_name:m.child_name||null,
+      to_teacher:m.to_teacher||null, tmima:m.tmima||null, text:m.text, date:m.date||null, time:m.time||null, read:false,
+      ...(noBatch?{}:{ batch_id:m.batch_id||null }),
+    }));
+    const run = async (noBatch) => sb.from("pt_messages").insert(strip(msgs,noBatch)).select();
+    return run(false).then(async (r)=>{
+      if(r.error && /batch_id/i.test(r.error.message||"")) r = await run(true);   // η βάση δεν έχει ακόμα τη στήλη → στέλνει χωρίς ομαδοποίηση
+      const ids = new Set(tmps.map(t=>t.id));
+      this.list = this.list.filter(x=>!ids.has(x.id));
+      if(r.error){ this.notify({ type:"reset" }); alert("⚠️ Τα μηνύματα ΔΕΝ στάλθηκαν: "+r.error.message); return false; }
+      this.list = [...r.data, ...this.list];
+      this.notify({ type:"change" });
+      return true;
     });
   },
   markRead(id){
@@ -910,6 +954,14 @@ const mkColor = (name) => {
 };
 
 const MEAL_OPTS = ["Έφαγε κανονικά","Έφαγε λίγο","Δεν έφαγε","Έφαγε πολύ καλά"];
+// Νέο ημερήσιο δελτίο: ο ύπνος είναι Ναι/Όχι + πεδίο σημειώσεων. Τα παλιά δελτία (π.χ. «2 ώρες») εμφανίζονται κανονικά.
+const NEW_REPORT = { prwino:"Έφαγε κανονικά", mesimeri:"Έφαγε λίγο", apogeyma:"Έφαγε κανονικά", ypnos:"Ναι", ypnos_notes:"", drastiriotita:true, proaulismos:true, mood:"😊 Χαρούμενο", notes:"" };
+const normReport = (r) => {
+  if(!r) return { ...NEW_REPORT };
+  if(r.ypnos==="Ναι"||r.ypnos==="Όχι") return { ...NEW_REPORT, ...r };
+  const no = r.ypnos==="Δεν κοιμήθηκε";
+  return { ...NEW_REPORT, ...r, ypnos:no?"Όχι":"Ναι", ypnos_notes: r.ypnos_notes || ((no||!r.ypnos)?"":`Κοιμήθηκε ${r.ypnos}`) };
+};
 const SLEEP_OPTS = ["15 λεπτά","30 λεπτά","45 λεπτά","1 ώρα","1:15","1:30","1:45","2 ώρες","2:15","2:30","2:45","3 ώρες","Δεν κοιμήθηκε"];
 const MOOD_OPTS = ["😊 Χαρούμενο","😄 Πολύ χαρούμενο","😐 Ουδέτερο","😴 Κουρασμένο"];
 
@@ -1228,8 +1280,9 @@ function Xristes({users, setUsers, currentUser, kids=[], reloadUsers}) {
   const [issued,setIssued] = useState({});      // κωδικοί που ορίστηκαν σε αυτή τη συνεδρία (δεν διαβάζονται ξανά από τη βάση)
   const [newCred,setNewCred] = useState(null);
   const [busy,setBusy] = useState(false);
+  const [kidQ,setKidQ] = useState("");
 
-  const emptyForm = { username:"", password:"", role:"teacher", name:"", tmima_id:"", child_id:"" };
+  const emptyForm = { username:"", password:"", role:"teacher", name:"", tmima_id:"", child_ids:[] };
   const [form,setForm] = useState(emptyForm);
   const f = (k,v) => setForm(p=>({...p,[k]:v}));
 
@@ -1258,7 +1311,9 @@ function Xristes({users, setUsers, currentUser, kids=[], reloadUsers}) {
   });
 
   const openAdd = () => { setForm({...emptyForm, password:genPassword()}); setEditUser(null); setShowAdd(true); };
-  const openEdit = (u) => { setForm({username:u.username, password:u.password||"", role:u.role, name:u.name, tmima_id:u.tmima_id||"", child_id:u.child_id||""}); setEditUser(u); setShowAdd(true); };
+  const openEdit = (u) => { setForm({username:u.username, password:u.password||"", role:u.role, name:u.name, tmima_id:u.tmima_id||"", child_ids:(u.child_ids&&u.child_ids.length)?u.child_ids:(u.child_id?[u.child_id]:[])}); setKidQ(""); setEditUser(u); setShowAdd(true); };
+  const kidNames = (u) => { const ids=(u.child_ids&&u.child_ids.length)?u.child_ids:(u.child_id?[u.child_id]:[]); return ids.length?ids.map(id=>kids.find(k=>k.id===id)?.name||"⚠️ άγνωστο παιδί").join(", "):"⚠️ χωρίς παιδί"; };
+  const toggleKid = (id) => setForm(p=>({...p, child_ids:p.child_ids.includes(id)?p.child_ids.filter(x=>x!==id):[...p.child_ids,id]}));
 
   const saveUser = async () => {
     if(busy) return;
@@ -1276,7 +1331,7 @@ function Xristes({users, setUsers, currentUser, kids=[], reloadUsers}) {
       const payload = {
         username: form.username.trim(), password: form.password, role: form.role, name: form.name.trim(), initials: mkInitials(form.name),
         ...(form.role==="teacher" ? { tmima_id: form.tmima_id, tmima: tmimaObj?.name||"" } : {}),
-        ...(form.role==="parent" ? { child_id: form.child_id?Number(form.child_id):undefined } : {}),
+        ...(form.role==="parent" ? { child_id: form.child_ids[0], child_ids: form.child_ids } : {}),
       };
       if(editUser) setUsers(users.map(u=>u.id===editUser.id?{...u,...payload}:u));
       else setUsers([...users, {id:Math.max(0,...users.map(u=>u.id))+1, ...payload}]);
@@ -1286,11 +1341,12 @@ function Xristes({users, setUsers, currentUser, kids=[], reloadUsers}) {
     if(!/^[a-z0-9._-]{3,32}$/.test(uname)){ alert("Το όνομα χρήστη: μόνο λατινικά γράμματα, αριθμοί, τελεία ή παύλα (3–32 χαρακτήρες)."); return; }
     if(form.password && form.password.length<8){ alert("Ο κωδικός πρέπει να έχει τουλάχιστον 8 χαρακτήρες."); return; }
     if(form.role==="teacher" && !form.tmima_id){ alert("Επιλέξτε τμήμα για τη δασκάλα."); return; }
-    if(form.role==="parent" && !form.child_id){ alert("Επιλέξτε το παιδί του γονέα."); return; }
+    if(form.role==="parent" && !form.child_ids.length){ alert("Επιλέξτε τουλάχιστον ένα παιδί για τον γονέα."); return; }
     const payload = {
       username:uname, role:form.role, name:form.name.trim(), initials:mkInitials(form.name),
       tmima_id: form.role==="teacher" ? form.tmima_id : null,
-      child_id: form.role==="parent" ? Number(form.child_id) : null,
+      child_id: form.role==="parent" ? form.child_ids[0] : null,
+      child_ids: form.role==="parent" ? form.child_ids : [],
       ...(form.password ? { password:form.password } : {}),
     };
     setBusy(true);
@@ -1319,7 +1375,7 @@ function Xristes({users, setUsers, currentUser, kids=[], reloadUsers}) {
   };
 
   // Δημιουργία των προτεινόμενων λογαριασμών προσωπικού με τυχαίους κωδικούς
-  const missingStaff = DEFAULT_STAFF.filter(d=>!users.some(u=>u.username.toLowerCase()===d.username));
+  const missingStaff = DEFAULT_STAFF.filter(d=>!users.some(u=>u.username.toLowerCase()===d.username) && (!d.tmima_id || TMIMATA.some(t=>t.id===d.tmima_id)));
   const createDefaultStaff = async () => {
     if(busy) return;
     if(!window.confirm(`Θα δημιουργηθούν ${missingStaff.length} λογαριασμοί προσωπικού (Γραμματεία και δασκάλες) με τυχαίους κωδικούς.\\nΟι κωδικοί θα εμφανιστούν ΜΙΑ φορά — θα πρέπει να τους σημειώσετε. Συνέχεια;`)) return;
@@ -1429,7 +1485,7 @@ function Xristes({users, setUsers, currentUser, kids=[], reloadUsers}) {
                 <div key={u.id} style={{display:"grid",gridTemplateColumns:"1.4fr 1fr 1fr",gap:10,padding:"12px 18px",background:i%2===0?"var(--beige)":"var(--white)",borderTop:i===0?"none":"1px solid var(--beige3)"}}>
                   <div>
                     <div style={{fontWeight:700,fontSize:13}}>{u.name}</div>
-                    <div style={{fontSize:11,color:"var(--text3)"}}>{u.tmima || (u.role==="admin"?"Διοίκηση":u.role==="secretary"?"Γραμματεία":"")}</div>
+                    <div style={{fontSize:11,color:"var(--text3)"}}>{u.role==="parent" ? kidNames(u) : (tmName(u.tmima_id) || (u.role==="admin"?"Διοίκηση":u.role==="secretary"?"Γραμματεία":""))}</div>
                   </div>
                   <div>
                     <div style={{fontSize:10,color:"var(--text3)",textTransform:"uppercase",letterSpacing:".04em"}}>Username</div>
@@ -1466,10 +1522,11 @@ function Xristes({users, setUsers, currentUser, kids=[], reloadUsers}) {
               <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
                 <span style={{fontWeight:700,fontSize:14}}>{u.name}</span>
                 <span style={{fontSize:10,fontWeight:700,padding:"2px 9px",borderRadius:20,background:ROLE_COLOR[u.role]+"18",color:ROLE_COLOR[u.role]}}>{ROLE_LABEL[u.role]}</span>
-                {u.tmima && <span className="badge b-earth" style={{fontSize:10}}>{u.tmima}</span>}
+                {tmName(u.tmima_id) && <span className="badge b-earth" style={{fontSize:10}}>{tmName(u.tmima_id)}</span>}
               </div>
               <div style={{fontSize:12,color:"var(--text3)",marginTop:3,display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}>
                 <span><Ico n="user" s={16}/>{u.username}</span>
+                {u.role==="parent" && <span style={{color:kidNames(u).includes("⚠️")?"#B91C1C":"var(--text2)"}}>👶 {kidNames(u)}</span>}
                 {(u.password ?? issued[u.id]) ? (
                   <span style={{display:"flex",alignItems:"center",gap:5}}>
                     🔑 {showPass[u.id] ? (u.password ?? issued[u.id]) : "••••••••"}
@@ -1547,11 +1604,24 @@ function Xristes({users, setUsers, currentUser, kids=[], reloadUsers}) {
 
             {form.role==="parent" && (
               <div className="fgroup">
-                <label className="flabel">Παιδί</label>
-                <select className="finput" value={form.child_id} onChange={e=>f("child_id",e.target.value)}>
-                  <option value="">Επιλέξτε παιδί...</option>
-                  {[...kids].sort((a,b)=>a.name.localeCompare(b.name,"el")).map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
+                <label className="flabel">Παιδιά που θα βλέπει ο γονέας <span style={{color:"var(--text3)",fontWeight:400}}>(για αδέρφια, επιλέξτε περισσότερα)</span></label>
+                {form.child_ids.length>0&&(
+                  <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:8}}>
+                    {form.child_ids.map(id=>(
+                      <span key={id} className="badge b-green" style={{fontSize:11,cursor:"pointer"}} onClick={()=>toggleKid(id)}>{kids.find(k=>k.id===id)?.name||"?"} ✕</span>
+                    ))}
+                  </div>
+                )}
+                <input className="finput" placeholder="Αναζήτηση παιδιού…" value={kidQ} onChange={e=>setKidQ(e.target.value)} style={{marginBottom:6}}/>
+                <div style={{maxHeight:180,overflowY:"auto",border:"1.5px solid var(--beige3)",borderRadius:10,padding:"4px 10px"}}>
+                  {[...kids].filter(c=>c.name.toLowerCase().includes(kidQ.trim().toLowerCase())).sort((a,b)=>a.name.localeCompare(b.name,"el")).map(c=>(
+                    <label key={c.id} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 2px",fontSize:13,cursor:"pointer"}}>
+                      <input type="checkbox" checked={form.child_ids.includes(c.id)} onChange={()=>toggleKid(c.id)}/>
+                      <span>{c.name}</span><span style={{marginLeft:"auto",fontSize:11,color:"var(--text3)"}}>{tmName(c.tmima)}</span>
+                    </label>
+                  ))}
+                  {kids.length===0&&<div style={{fontSize:12,color:"var(--text3)",padding:8}}>Δεν υπάρχουν παιδιά στο Μητρώο.</div>}
+                </div>
               </div>
             )}
 
@@ -1575,7 +1645,7 @@ function Dashboard({user, kids, setPage}) {
   const [viewProtocol, setViewProtocol] = useState(null);
   const myTmima = user.tmima_id || user.tmima;
   const unreadMsgs = PT_MESSAGES.list.filter(m=>{
-    if(m.read) return false;
+    if(m.read || m.from_role!=="parent") return false;
     if(user.role==="admin"||user.role==="secretary") return true;
     if(user.role==="teacher") return m.tmima===myTmima || m.to_teacher===user.name;
     return false;
@@ -1665,15 +1735,15 @@ function Dashboard({user, kids, setPage}) {
         🏡 Τμήματα σήμερα
       </div>
       <div className="tmima-grid" style={{marginBottom:24}}>
-        {TMIMATA.map(t=>{
+        {TMIMATA.filter(t=>user.role!=="teacher" || t.id===user.tmima_id).map(t=>{
           const tk=kids.filter(c=>c.tmima===t.id);
           const p=tk.filter(c=>c.present).length;
           return (
             <div key={t.id} className="tmima-card" style={{borderColor:t.color+"55"}} onClick={()=>setPage("parousies")}>
               <div className="tm-name">{t.name}</div>
-              <div className="tm-teacher">{t.teacher.split(" ")[0]}</div>
-              <div className="tm-count" style={{color:t.color}}>{p}<span style={{fontSize:14,color:"var(--text3)",fontFamily:"DM Sans",fontWeight:500}}>/{t.capacity}</span></div>
-              <div className="pbar"><div className="pbar-fill" style={{width:`${p/t.capacity*100}%`,background:t.color}}/></div>
+              <div className="tm-teacher">{t.teacher ? t.teacher.split(" ")[0] : `${tk.length} παιδιά`}</div>
+              <div className="tm-count" style={{color:t.color}}>{p}<span style={{fontSize:14,color:"var(--text3)",fontFamily:"DM Sans",fontWeight:500}}>/{tk.length}</span></div>
+              <div className="pbar"><div className="pbar-fill" style={{width:`${tk.length?p/tk.length*100:0}%`,background:t.color}}/></div>
             </div>
           );
         })}
@@ -1820,7 +1890,7 @@ function ParastatikoPar({label, icon, color, colorLight, user, selId, subcats, s
 }
 
 // ─── ΠΑΙΔΙΑ & ΦΑΚΕΛΟΙ ───────────────────────────────────────────────────────
-function Paidia({user, kids, setKids, onCreateParent}) {
+function Paidia({user, kids, setKids, onCreateParent, onDeleteKid}) {
   const [search,setSearch] = useState("");
   const [ft,setFt] = useState("all");
   const [showAdd,setShowAdd] = useState(false);
@@ -1831,7 +1901,7 @@ function Paidia({user, kids, setKids, onCreateParent}) {
   const emptyForm = {
     // ΣΤΟΙΧΕΙΑ ΠΑΙΔΙΟΥ
     name:"", birthdate:"", topos_katoikias:"", odos:"", arithmos:"", tk:"", tilefono_oikias:"",
-    tmima:"vr-a",
+    tmima:TMIMATA[0]?.id||"",
     // ΠΑΤΕΡΑΣ
     pat_name:"", pat_kinito:"", pat_epaggelma:"", pat_ergasia:"",
     pat_afm:"", pat_doy:"", pat_email:"",
@@ -1862,7 +1932,7 @@ function Paidia({user, kids, setKids, onCreateParent}) {
     par_erg_apodeixi:false, par_erg_apodeixi_date:null, par_erg_apodeixi_hist:[],
     par_erg_timolog:false,  par_erg_timolog_date:null,  par_erg_timolog_hist:[],
     // computed
-    present:false, didaktra:"pending", amount:350,
+    present:false, didaktra:"pending", amount:TMIMATA[0]?.fee||0,
     daily_reports:[], messages:[], docs:[],
   };
   const [form,setForm] = useState(emptyForm);
@@ -1886,15 +1956,20 @@ function Paidia({user, kids, setKids, onCreateParent}) {
       if(!/^[a-z0-9._-]{3,32}$/.test(form.parent_username.trim().toLowerCase())){ alert("Το όνομα χρήστη γονέα: μόνο λατινικά γράμματα, αριθμοί, τελεία ή παύλα (3–32 χαρακτήρες)."); return; }
       if(form.parent_password.length<8){ alert("Ο κωδικός του γονέα πρέπει να έχει τουλάχιστον 8 χαρακτήρες."); return; }
     }
-    const amount = t?.type==="vrefiko"?350:280;
+    // Δίδακτρα: μόνο η Διοίκηση ορίζει ποσό/κατάσταση. Η Γραμματεία κρατά ό,τι υπάρχει (ή την προεπιλογή του τμήματος για νέο παιδί).
+    const isAdmin = user.role==="admin";
+    const amount = isAdmin ? (Number(String(form.amount).replace(",","."))||0) : (editMode&&sel ? sel.amount : (t?.fee||0));
+    const didaktra = isAdmin ? (form.didaktra||"pending") : (editMode&&sel ? sel.didaktra : "pending");
     let kidId;
     if(editMode && sel){
       kidId = sel.id;
-      setKids(kids.map(c=>c.id===sel.id?{...c,...form,amount}:c));
-      setSel({...sel,...form});
+      // ενημερώνουμε το υπάρχον παιδί (ίδιο id) — δεν πειράζουμε παρουσία/δελτία που άλλαξαν στο μεταξύ
+      const { daily_reports:_dr, present:_pr, ...fields } = form;
+      setKids(prev=>prev.map(c=>c.id===sel.id?{...c,...fields,id:c.id,amount,didaktra}:c));
+      setSel({...sel,...fields,id:sel.id,amount,didaktra});
     } else {
       kidId = Date.now();
-      setKids([...kids,{...form, id:kidId, amount}]);
+      setKids([...kids,{...form, id:kidId, amount, didaktra}]);
     }
     const pwd = form.parent_password, uname = form.parent_username.trim().toLowerCase(), pname = form.mit_name||form.pat_name||"Γονέας";
     setShowAdd(false); setAddStep(1); setForm(emptyForm); setEditMode(false);
@@ -1907,6 +1982,29 @@ function Paidia({user, kids, setKids, onCreateParent}) {
         alert("⚠️ Το παιδί αποθηκεύτηκε, αλλά ο λογαριασμός γονέα ΔΕΝ δημιουργήθηκε:\n"+e.message+"\n\nΜπορείτε να τον φτιάξετε από «Χρήστες».");
       }
     }
+  };
+
+  const deleteKid = async () => {
+    if(!sel || user.role!=="admin") return;
+    const k = sel;
+    if(!window.confirm(`Διαγραφή του παιδιού «${k.name}»;\n\nΘα διαγραφούν ΜΟΝΙΜΑ η καρτέλα, τα ημερήσια δελτία και τα μηνύματά του.\nΑν ο γονέας δεν έχει άλλο παιδί, διαγράφεται και ο λογαριασμός του.\nΔεν μπορεί να αναιρεθεί.`)) return;
+    setSel(null);
+    setKids(prev=>prev.filter(c=>c.id!==k.id));
+    try { if(onDeleteKid) await onDeleteKid(k); }
+    catch(e){ alert("⚠️ Το παιδί διαγράφηκε, αλλά δεν ολοκληρώθηκε ο καθαρισμός του λογαριασμού γονέα:\n"+e.message+"\n\nΜπορείτε να τον διορθώσετε από «Χρήστες»."); }
+  };
+  const quickAmount = () => {
+    if(!sel || user.role!=="admin") return;
+    const v = window.prompt(`Μηνιαίο ποσό για «${sel.name}» (€):`, String(sel.amount??0));
+    if(v===null) return;
+    const n = Number(String(v).replace(",","."));
+    if(!Number.isFinite(n) || n<0){ alert("Γράψτε έναν έγκυρο αριθμό."); return; }
+    setKids(prev=>prev.map(c=>c.id===sel.id?{...c,amount:n}:c)); setSel({...sel,amount:n});
+  };
+  const toggleKidPaid = () => {
+    if(!sel || user.role!=="admin") return;
+    const next = sel.didaktra==="paid"?"pending":"paid";
+    setKids(prev=>prev.map(c=>c.id===sel.id?{...c,didaktra:next}:c)); setSel({...sel,didaktra:next});
   };
 
   const openEditKid = () => {
@@ -2022,7 +2120,7 @@ function Paidia({user, kids, setKids, onCreateParent}) {
 
       {/* ── ADD MODAL (multi-step) ── */}
       {showAdd&&(
-        <div className="modal-bg" onClick={e=>e.target===e.currentTarget&&setShowAdd(false)}>
+        <div className="modal-bg" style={{zIndex:1100}} onClick={e=>e.target===e.currentTarget&&setShowAdd(false)}>
           <div className="modal modal-lg" style={{maxWidth:820}}>
 
             {/* Header */}
@@ -2058,8 +2156,8 @@ function Paidia({user, kids, setKids, onCreateParent}) {
                 <div className="f2">
                   <div className="fgroup">
                     <label className="flabel">Τμήμα εγγραφής *</label>
-                    <select className="finput" value={form.tmima} onChange={e=>f("tmima",e.target.value)}>
-                      {TMIMATA.map(t=><option key={t.id} value={t.id}>{t.name} ({t.type==="vrefiko"?"Βρεφικό":"Παιδικό"} — {t.capacity} θέσεις)</option>)}
+                    <select className="finput" value={form.tmima} onChange={e=>{ const v=e.target.value; setForm(p=>({...p,tmima:v,...(editMode?{}:{amount:TMIMATA.find(t=>t.id===v)?.fee||0})})); }}>
+                      {TMIMATA.map(t=><option key={t.id} value={t.id}>{t.name} ({t.type==="vrefiko"?"Βρεφικό":"Παιδικό"})</option>)}
                     </select>
                   </div>
                   <div className="fgroup">
@@ -2260,6 +2358,25 @@ function Paidia({user, kids, setKids, onCreateParent}) {
             {/* ── STEP 4: ΟΙΚΟΝΟΜΙΚΑ ── */}
             {addStep===4&&(
               <div>
+                <div className="section-hd"><Ico n="euro" s={16}/>Δίδακτρα</div>
+                {user.role==="admin" ? (
+                  <div className="f2" style={{marginBottom:18}}>
+                    <div className="fgroup">
+                      <label className="flabel">Μηνιαίο ποσό (€)</label>
+                      <input className="finput" type="number" min="0" step="1" value={form.amount??""} onChange={e=>f("amount",e.target.value)}/>
+                    </div>
+                    <div className="fgroup">
+                      <label className="flabel">Κατάσταση πληρωμής</label>
+                      <select className="finput" value={form.didaktra||"pending"} onChange={e=>f("didaktra",e.target.value)}>
+                        <option value="pending">Εκκρεμεί</option><option value="paid">Πληρωμένο</option>
+                      </select>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{background:"var(--beige)",borderRadius:10,padding:"10px 14px",marginBottom:18,fontSize:12,color:"var(--text3)"}}>
+                    ℹ️ Το ποσό των διδάκτρων{editMode&&form.amount!=null?` (${form.amount} €)`:""} ορίζεται και αλλάζει μόνο από τη Διοίκηση.
+                  </div>
+                )}
                 <div className="section-hd"><Ico n="briefcase" s={16}/>Οικονομικά Στοιχεία Πατέρα <span style={{color:"var(--burg)",fontSize:11}}>(υποχρεωτική συμπλήρωση)</span></div>
                 <div className="fgroup">
                   <label className="flabel">Ονοματεπώνυμο (όπως στην ταυτότητα) *</label>
@@ -2520,10 +2637,12 @@ function Paidia({user, kids, setKids, onCreateParent}) {
                   <div style={{padding:"14px 16px",background:"var(--beige)",borderRadius:12,textAlign:"center"}}>
                     <div style={{fontSize:11,color:"var(--text3)",marginBottom:4,fontWeight:600,textTransform:"uppercase"}}>Μηνιαία δίδακτρα</div>
                     <div style={{fontFamily:"Playfair Display,serif",fontSize:26,fontWeight:700,color:"var(--green)"}}>{sel.amount||"—"}€</div>
+                    {user.role==="admin"&&<button className="btn btn-ghost btn-xs" style={{marginTop:8}} onClick={quickAmount}>✏️ Αλλαγή ποσού</button>}
                   </div>
                   <div style={{padding:"14px 16px",background:sel.didaktra==="paid"?"#ECFDF5":"#FFFBEB",borderRadius:12,textAlign:"center"}}>
                     <div style={{fontSize:11,color:"var(--text3)",marginBottom:4,fontWeight:600,textTransform:"uppercase"}}>Κατάσταση</div>
                     <div style={{fontFamily:"Playfair Display,serif",fontSize:18,fontWeight:700,color:sel.didaktra==="paid"?"#059669":"#D97706"}}>{sel.didaktra==="paid"?"✓ Εξοφλημένο":"⏳ Εκκρεμεί"}</div>
+                    {user.role==="admin"&&<button className="btn btn-ghost btn-xs" style={{marginTop:8}} onClick={toggleKidPaid}>{sel.didaktra==="paid"?"Σήμανση ως εκκρεμές":"Σήμανση ως πληρωμένο"}</button>}
                   </div>
                 </div>
 
@@ -2639,6 +2758,7 @@ function Paidia({user, kids, setKids, onCreateParent}) {
                 <button className="btn btn-primary btn-sm" onClick={()=>setShowMsgModal(true)}>✉️ Μήνυμα γονέα</button>
               )}
               <button className="btn btn-ghost btn-sm" onClick={openEditKid}>✏️ Επεξεργασία</button>
+              {user.role==="admin"&&<button className="btn btn-ghost btn-sm" style={{color:"#B91C1C",borderColor:"#F3C9C9"}} onClick={deleteKid}>🗑️ Διαγραφή</button>}
               <div style={{flex:1}}/>
               <button className="modal-close" style={{width:"auto",padding:"6px 12px",borderRadius:8,fontSize:13}} onClick={()=>setSel(null)}>Κλείσιμο</button>
             </div>
@@ -2674,7 +2794,7 @@ function Paidia({user, kids, setKids, onCreateParent}) {
 
 // ─── ΠΑΡΟΥΣΙΕΣ ───────────────────────────────────────────────────────────────
 function Parousies({user, kids, setKids}) {
-  const def = user.role==="teacher"?(TMIMATA.find(t=>t.name===user.tmima)?.id||"vr-a"):"vr-a";
+  const def = user.role==="teacher"?(user.tmima_id||TMIMATA[0]?.id||""):(TMIMATA[0]?.id||"");
   const [st,setSt] = useState(def);
   const t = TMIMATA.find(t=>t.id===st);
   const tk = kids.filter(c=>c.tmima===st);
@@ -2687,7 +2807,7 @@ function Parousies({user, kids, setKids}) {
         {TMIMATA.map(t=>(
           <button key={t.id} className={`btn ${st===t.id?"btn-primary":"btn-ghost"}`}
             onClick={()=>setSt(t.id)}
-            disabled={user.role==="teacher"&&user.tmima!==t.name}
+            disabled={user.role==="teacher"&&user.tmima_id!==t.id}
           >{t.name}</button>
         ))}
       </div>
@@ -2695,7 +2815,7 @@ function Parousies({user, kids, setKids}) {
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
           <div>
             <div className="card-title" style={{marginBottom:2}}>{t?.name} — Παρουσίες</div>
-            <div style={{fontSize:12,color:"var(--text3)"}}>{t?.teacher} · {todayGR}</div>
+            <div style={{fontSize:12,color:"var(--text3)"}}>{t?.teacher?t.teacher+" · ":""}{todayGR}</div>
           </div>
           <div style={{textAlign:"right"}}>
             <div style={{fontFamily:"Playfair Display,serif",fontSize:32,fontWeight:700,color:"var(--green)"}}>{pres}<span style={{fontSize:16,color:"var(--text3)",fontFamily:"DM Sans"}}>/{tk.length}</span></div>
@@ -2725,7 +2845,7 @@ function Deltion({user, kids, setKids}) {
   const myT = user.tmima_id||user.tmima_id;
   const [tmimaFilter, setTmimaFilter] = useState(isStaffAll ? "all" : (user.tmima_id||""));
   const [sk,setSk] = useState(null);
-  const [form,setForm] = useState({prwino:"Έφαγε κανονικά",mesimeri:"Έφαγε λίγο",apogeyma:"Έφαγε κανονικά",ypnos:"2 ώρες",drastiriotita:true,proaulismos:true,mood:"😊 Χαρούμενο",notes:""});
+  const [form,setForm] = useState({ ...NEW_REPORT });
   const [ml,setMl] = useState([]);
   const fr = useRef();
 
@@ -2745,7 +2865,7 @@ function Deltion({user, kids, setKids}) {
     <div className="page-in">
       <div className="card" style={{marginBottom:20}}>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10,marginBottom:6}}>
-          <div className="card-title" style={{margin:0}}>📝 Ημερήσιο Δελτίο{!isStaffAll?` — ${user.tmima}`:""}</div>
+          <div className="card-title" style={{margin:0}}>📝 Ημερήσιο Δελτίο{!isStaffAll?` — ${tmName(user.tmima_id)}`:""}</div>
           {isStaffAll && (
             <select className="select" value={tmimaFilter} onChange={e=>setTmimaFilter(e.target.value)}>
               <option value="all">Όλα τα τμήματα</option>
@@ -2765,7 +2885,7 @@ function Deltion({user, kids, setKids}) {
             const has=(c.daily_reports||[]).some(r=>r.date===TODAY);
             const t = TMIMATA.find(t=>t.id===c.tmima);
             return (
-              <div key={c.id} onClick={()=>{setSk(c);const r=(c.daily_reports||[]).find(r=>r.date===TODAY);setForm(r||{prwino:"Έφαγε κανονικά",mesimeri:"Έφαγε λίγο",apogeyma:"Έφαγε κανονικά",ypnos:"2 ώρες",drastiriotita:true,proaulismos:true,mood:"😊 Χαρούμενο",notes:""});setMl([]);}}
+              <div key={c.id} onClick={()=>{setSk(c);const r=(c.daily_reports||[]).find(r=>r.date===TODAY);setForm(normReport(r));setMl([]);}}
                 style={{padding:14,borderRadius:12,border:`1.5px solid ${has?"#34D399":"var(--beige3)"}`,background:has?"#F0FDF4":"var(--white)",cursor:"pointer",textAlign:"center",transition:"all .15s"}}>
                 <div style={{fontSize:26}}>{has?"✅":"📝"}</div>
                 <div style={{fontWeight:600,fontSize:12,marginTop:7}}>{c.name}</div>
@@ -2793,7 +2913,8 @@ function Deltion({user, kids, setKids}) {
             ))}
 
             <div className="section-hd"><Ico n="moon" s={16}/>Ύπνος</div>
-            <div className="pill-row" style={{marginBottom:16}}>{SLEEP_OPTS.map(o=><div key={o} className={`pill ${form.ypnos===o?"sel":""}`} onClick={()=>setForm({...form,ypnos:o})}>{o}</div>)}</div>
+            <div className="pill-row" style={{marginBottom:10}}>{["Ναι","Όχι"].map(o=><div key={o} className={`pill ${form.ypnos===o?"sel":""}`} onClick={()=>setForm({...form,ypnos:o})}>{o==="Ναι"?"😴 Ναι, κοιμήθηκε":"🙂 Όχι"}</div>)}</div>
+            <textarea className="finput" rows={2} placeholder="Σημειώσεις ύπνου (π.χ. κοιμήθηκε 1,5 ώρα, ξύπνησε δύο φορές)..." value={form.ypnos_notes||""} onChange={e=>setForm({...form,ypnos_notes:e.target.value})} style={{marginBottom:16,resize:"vertical",width:"100%"}}/>
 
             <div className="section-hd"><Ico n="palette" s={16}/>Δραστηριότητα · Προαύλιο</div>
             <div style={{display:"flex",flexDirection:"column",gap:12,marginBottom:16}}>
@@ -3167,107 +3288,149 @@ function Academy() {
 }
 
 // ─── ΕΠΙΚΟΙΝΩΝΙΑ ─────────────────────────────────────────────────────────────
-function Epikoinonia({user, onNewParentMsg}) {
-  const [tab,setTab]=useState(user.role==="teacher"?"parent":"inbox"), [sc,setSc]=useState(false);
-  const [nm,setNm]=useState({to:"",subject:"",body:"",type:"general"});
-  const [msgs,setMsgs]=useState(SEC_MSGS);
+function Epikoinonia({user, kids=[]}) {
+  const isTeacher = user.role==="teacher";
   const [ptMsgs,setPtMsgs]=useState(PT_MESSAGES.list);
   const [replyTo,setReplyTo]=useState(null);
   const [replyText,setReplyText]=useState("");
+  const [showCompose,setShowCompose]=useState(false);
+  const [mode,setMode]=useState("one");            // one = ένας γονέας · group = ομάδα γονέων
+  const [oneKid,setOneKid]=useState("");
+  const [grp,setGrp]=useState("");
+  const [picked,setPicked]=useState(()=>new Set());
+  const [kidSearch,setKidSearch]=useState("");
+  const [body,setBody]=useState("");
+  const [sending,setSending]=useState(false);
+  const [openBatch,setOpenBatch]=useState({});
 
-  // Subscribe to live parent→teacher messages
-  useEffect(()=>{
-    const unsub = PT_MESSAGES.subscribe(()=>setPtMsgs([...PT_MESSAGES.list]));
-    return unsub;
-  },[]);
+  // Ζωντανά μηνύματα
+  useEffect(()=>PT_MESSAGES.subscribe(()=>setPtMsgs([...PT_MESSAGES.list])),[]);
 
-  const send=()=>{setMsgs([...msgs,{id:Date.now(),from:user.name,subject:nm.subject,body:nm.body,date:TODAY,type:nm.type,read:true}]);setSc(false);setNm({to:"",subject:"",body:"",type:"general"});};
-  const nc={financial:"#FFFBEB",route:"#F0FDF4",thematic:"#EFF6FF",general:"#F9FAFB"};
-  const ni={financial:"💰",route:"🚌",thematic:"📚",general:"📢"};
+  const nowTime = () => new Date().toLocaleTimeString("el-GR",{hour:"2-digit",minute:"2-digit"});
+  const myTmima = user.tmima_id;
 
-  // Filter parent messages: teachers see only their tmima, admin/secretary see all
-  const myTmima = user.tmima_id || user.tmima;
-  const visiblePtMsgs = ptMsgs.filter(m=>{
+  // Ποια μηνύματα βλέπει ο καθένας: δασκάλες μόνο του τμήματός τους, Διοίκηση/Γραμματεία όλα
+  const visible = ptMsgs.filter(m=>{
     if(user.role==="admin"||user.role==="secretary") return true;
-    if(user.role==="teacher") return m.tmima===myTmima || m.to_teacher===user.name;
+    if(isTeacher) return m.tmima===myTmima || m.to_teacher===user.name;
     return false;
   });
+  const unread = visible.filter(m=>m.from_role==="parent" && !m.read).length;
 
-  const tmName = (id)=>TMIMATA.find(t=>t.id===id)?.name||id;
+  // Τα μηνύματα που έστειλε το προσωπικό ομαδοποιούνται (ένα μήνυμα προς πολλούς γονείς = μία κάρτα)
+  const items = []; const seen = new Map();
+  visible.forEach(m=>{
+    if(m.from_role==="staff" && m.batch_id){
+      let g = seen.get(m.batch_id);
+      if(!g){ g = { ...m, _group:[m] }; seen.set(m.batch_id,g); items.push(g); } else g._group.push(m);
+    } else items.push(m);
+  });
+
+  // Παραλήπτες που μπορεί να επιλέξει ο χρήστης (οι δασκάλες: μόνο το τμήμα τους)
+  const mine = kids.filter(c=>!isTeacher||c.tmima===myTmima).slice().sort((a,b)=>a.name.localeCompare(b.name,"el"));
+  const tms = TMIMATA.filter(t=>!isTeacher||t.id===myTmima);
+  const shown = mine.filter(c=>c.name.toLowerCase().includes(kidSearch.trim().toLowerCase()));
+
+  let targets = [];
+  if(mode==="one") targets = mine.filter(c=>String(c.id)===String(oneKid));
+  else if(grp==="all") targets = mine;
+  else if(grp==="pick") targets = mine.filter(c=>picked.has(c.id));
+  else if(grp.startsWith("t:")) targets = mine.filter(c=>c.tmima===grp.slice(2));
+
+  const openCompose = () => {
+    setMode("one"); setOneKid(""); setGrp(isTeacher&&myTmima?"t:"+myTmima:""); setPicked(new Set()); setKidSearch(""); setBody(""); setShowCompose(true);
+  };
+  const togglePick = (id) => setPicked(p=>{ const n=new Set(p); n.has(id)?n.delete(id):n.add(id); return n; });
+
+  const send = async () => {
+    if(sending || !body.trim() || !targets.length) return;
+    if(targets.length>1 && !window.confirm(`Να σταλεί το μήνυμα σε ${targets.length} γονείς;`)) return;
+    setSending(true);
+    const batch = targets.length>1 ? "b"+Date.now().toString(36)+Math.random().toString(36).slice(2,6) : null;
+    const time = nowTime();
+    const rows = targets.map(k=>({
+      from_role:"staff", from_name:user.name, child_id:k.id, child_name:k.name,
+      to_teacher:TMIMATA.find(t=>t.id===k.tmima)?.teacher||"", tmima:k.tmima,
+      text:body.trim(), date:TODAY, time, read:true, batch_id:batch,
+    }));
+    const ok = await PT_MESSAGES.addMany(rows);
+    setSending(false);
+    if(ok){ setShowCompose(false); setBody(""); alert(targets.length>1 ? `✅ Το μήνυμα στάλθηκε σε ${targets.length} γονείς.` : "✅ Το μήνυμα στάλθηκε στον γονέα."); }
+  };
 
   return (
     <div className="page-in">
       <div style={{display:"flex",gap:8,marginBottom:20,alignItems:"center",flexWrap:"wrap"}}>
-        <button className={`btn ${tab==="parent"?"btn-primary":"btn-ghost"}`} onClick={()=>setTab("parent")}>
-          👨‍👩‍👧 Μηνύματα Γονέων {visiblePtMsgs.filter(m=>!m.read).length>0&&<span className="badge b-red" style={{marginLeft:6,fontSize:9}}>{visiblePtMsgs.filter(m=>!m.read).length}</span>}
-        </button>
-        {(user.role==="admin"||user.role==="secretary")&&<>
-          <button className={`btn ${tab==="inbox"?"btn-primary":"btn-ghost"}`} onClick={()=>setTab("inbox")}>📥 Ανακοινώσεις</button>
-          <button className="btn btn-primary" style={{marginLeft:"auto"}} onClick={()=>setSc(true)}>✉️ Νέο μήνυμα</button>
-        </>}
+        <div style={{fontFamily:"Playfair Display,serif",fontWeight:600,fontSize:16,color:"var(--green)"}}>👨‍👩‍👧 Επικοινωνία με γονείς</div>
+        {unread>0&&<span className="badge b-red" style={{fontSize:10}}>{unread} νέα</span>}
+        <button className="btn btn-primary" style={{marginLeft:"auto"}} onClick={openCompose}>✉️ Νέο μήνυμα</button>
       </div>
 
-      {/* ── ΜΗΝΥΜΑΤΑ ΓΟΝΕΩΝ ── */}
-      {tab==="parent"&&(
-        <div>
-          {(user.role==="admin"||user.role==="secretary")&&(
-            <div style={{background:"var(--blue2)",border:"1px solid var(--blue)",borderRadius:12,padding:"11px 15px",marginBottom:14,fontSize:12,color:"#0E5A75",display:"flex",alignItems:"center",gap:8}}>
-              <span style={{fontSize:16}}>👁️</span>
-              <span>Ως Διοίκηση βλέπετε <strong>όλη</strong> την επικοινωνία γονέων με τις δασκάλες, για εποπτεία.</span>
-            </div>
-          )}
-          <div className="card">
-            {visiblePtMsgs.length===0?(
-              <div style={{textAlign:"center",padding:"40px 16px",color:"var(--text3)"}}>
-                <div style={{fontSize:36,marginBottom:10}}>📭</div>
-                <div style={{fontSize:14,fontWeight:600,marginBottom:4}}>Κανένα μήνυμα ακόμα</div>
-                <div style={{fontSize:12}}>Τα μηνύματα των γονέων θα εμφανίζονται εδώ</div>
-              </div>
-            ):visiblePtMsgs.map(m=>(
-              <div key={m.id} style={{padding:"14px 16px",borderRadius:12,border:`1.5px solid ${m.read?"var(--beige3)":"var(--green)"}`,marginBottom:9,background:m.read?"var(--white)":"var(--green3)"}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:7}}>
-                  <div style={{display:"flex",alignItems:"center",gap:10}}>
-                    <div className="av" style={{background:mkColor(m.from_name),width:38,height:38,fontSize:15,borderRadius:11}}>{m.from_name.charAt(0)}</div>
-                    <div>
-                      <div style={{fontWeight:700,fontSize:13}}>{m.from_name}</div>
-                      <div style={{fontSize:11,color:"var(--text3)"}}>
-                        Γονέας του/της <strong>{m.child_name}</strong>
-                      </div>
-                    </div>
-                  </div>
-                  <div style={{textAlign:"right",flexShrink:0}}>
-                    <div style={{fontSize:11,color:"var(--text3)"}}>{m.date}</div>
-                    <div style={{fontSize:11,color:"var(--text3)"}}>{m.time}</div>
-                  </div>
-                </div>
-                <div style={{fontSize:13,color:"var(--text)",lineHeight:1.6,marginBottom:8,paddingLeft:48}}>{m.text}</div>
-                <div style={{display:"flex",alignItems:"center",gap:8,paddingLeft:48,flexWrap:"wrap"}}>
-                  <span className="badge b-earth" style={{fontSize:10}}>📚 {tmName(m.tmima)}</span>
-                  {m.to_teacher&&<span className="badge b-gray" style={{fontSize:10}}>➡️ {m.to_teacher}</span>}
-                  {!m.read&&<span className="badge b-red" style={{fontSize:10}}>Μη αναγνωσμένο</span>}
-                  <button className="btn btn-ghost btn-xs" style={{marginLeft:"auto"}}
-                    onClick={()=>PT_MESSAGES.markRead(m.id)}>
-                    {m.read?"✓ Διαβάστηκε":"Σήμανση ως διαβασμένο"}
-                  </button>
-                  <button className="btn btn-primary btn-xs" onClick={()=>{setReplyTo(m);setReplyText("");}}>↩️ Απάντηση</button>
-                </div>
-              </div>
-            ))}
-          </div>
+      {(user.role==="admin"||user.role==="secretary")&&(
+        <div style={{background:"var(--blue2)",border:"1px solid var(--blue)",borderRadius:12,padding:"11px 15px",marginBottom:14,fontSize:12,color:"#0E5A75",display:"flex",alignItems:"center",gap:8}}>
+          <span style={{fontSize:16}}>👁️</span>
+          <span>Ως Διοίκηση βλέπετε <strong>όλη</strong> την επικοινωνία γονέων με τις δασκάλες, για εποπτεία.</span>
         </div>
       )}
 
-      {/* REPLY MODAL */}
+      <div className="card">
+        {items.length===0?(
+          <div style={{textAlign:"center",padding:"40px 16px",color:"var(--text3)"}}>
+            <div style={{fontSize:36,marginBottom:10}}>📭</div>
+            <div style={{fontSize:14,fontWeight:600,marginBottom:4}}>Κανένα μήνυμα ακόμα</div>
+            <div style={{fontSize:12}}>Τα μηνύματα προς και από τους γονείς θα εμφανίζονται εδώ</div>
+          </div>
+        ):items.map(m=>{
+          const staff = m.from_role==="staff";
+          const grpList = m._group || [m];
+          return (
+            <div key={m.id} style={{padding:"14px 16px",borderRadius:12,border:`1.5px solid ${staff?"var(--beige3)":(m.read?"var(--beige3)":"var(--green)")}`,marginBottom:9,background:staff?"var(--beige)":(m.read?"var(--white)":"var(--green3)")}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:7}}>
+                <div style={{display:"flex",alignItems:"center",gap:10}}>
+                  <div className="av" style={{background:mkColor(m.from_name),width:38,height:38,fontSize:15,borderRadius:11}}>{m.from_name.charAt(0)}</div>
+                  <div>
+                    <div style={{fontWeight:700,fontSize:13}}>{staff?`📤 ${m.from_name}`:m.from_name}</div>
+                    <div style={{fontSize:11,color:"var(--text3)"}}>
+                      {staff
+                        ? (grpList.length>1 ? <>Προς <strong>{grpList.length} γονείς</strong></> : <>Προς γονέα του/της <strong>{m.child_name}</strong></>)
+                        : <>Γονέας του/της <strong>{m.child_name}</strong></>}
+                    </div>
+                  </div>
+                </div>
+                <div style={{textAlign:"right",flexShrink:0}}>
+                  <div style={{fontSize:11,color:"var(--text3)"}}>{m.date}</div>
+                  <div style={{fontSize:11,color:"var(--text3)"}}>{m.time}</div>
+                </div>
+              </div>
+              <div style={{fontSize:13,color:"var(--text)",lineHeight:1.6,marginBottom:8,paddingLeft:48,whiteSpace:"pre-wrap"}}>{m.text}</div>
+              <div style={{display:"flex",alignItems:"center",gap:8,paddingLeft:48,flexWrap:"wrap"}}>
+                {tmName(m.tmima)&&<span className="badge b-earth" style={{fontSize:10}}>📚 {tmName(m.tmima)}</span>}
+                {!staff&&m.to_teacher&&<span className="badge b-gray" style={{fontSize:10}}>➡️ {m.to_teacher}</span>}
+                {!staff&&!m.read&&<span className="badge b-red" style={{fontSize:10}}>Μη αναγνωσμένο</span>}
+                {staff&&grpList.length>1&&(
+                  <button className="btn btn-ghost btn-xs" onClick={()=>setOpenBatch(o=>({...o,[m.batch_id]:!o[m.batch_id]}))}>
+                    {openBatch[m.batch_id]?"Απόκρυψη παραληπτών":"Δες παραλήπτες"}
+                  </button>
+                )}
+                {!staff&&(<>
+                  <button className="btn btn-ghost btn-xs" style={{marginLeft:"auto"}} onClick={()=>PT_MESSAGES.markRead(m.id)}>{m.read?"✓ Διαβάστηκε":"Σήμανση ως διαβασμένο"}</button>
+                  <button className="btn btn-primary btn-xs" onClick={()=>{setReplyTo(m);setReplyText("");}}>↩️ Απάντηση</button>
+                </>)}
+              </div>
+              {staff&&grpList.length>1&&openBatch[m.batch_id]&&(
+                <div style={{paddingLeft:48,marginTop:8,fontSize:12,color:"var(--text2)",lineHeight:1.7}}>{grpList.map(g=>g.child_name).filter(Boolean).join(" · ")}</div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* ΑΠΑΝΤΗΣΗ */}
       {replyTo && (
         <div className="modal-bg" onClick={e=>e.target===e.currentTarget&&setReplyTo(null)}>
           <div className="modal">
-            <div className="modal-title">
-              ↩️ Απάντηση σε {replyTo.from_name}
-              <button className="modal-close" onClick={()=>setReplyTo(null)}>✕</button>
-            </div>
-            <div style={{background:"var(--beige)",borderRadius:10,padding:"10px 14px",marginBottom:14,fontSize:12,color:"var(--text2)",fontStyle:"italic"}}>
-              «{replyTo.text}»
-            </div>
+            <div className="modal-title">↩️ Απάντηση σε {replyTo.from_name}<button className="modal-close" onClick={()=>setReplyTo(null)}>✕</button></div>
+            <div style={{background:"var(--beige)",borderRadius:10,padding:"10px 14px",marginBottom:14,fontSize:12,color:"var(--text2)",fontStyle:"italic"}}>«{replyTo.text}»</div>
             <div className="fgroup">
               <label className="flabel">Η απάντησή σας</label>
               <textarea className="finput" rows={4} value={replyText} onChange={e=>setReplyText(e.target.value)} placeholder="Γράψτε την απάντησή σας..." style={{resize:"vertical",width:"100%"}}/>
@@ -3278,7 +3441,7 @@ function Epikoinonia({user, onNewParentMsg}) {
                 PT_MESSAGES.add({
                   from_role:"staff", from_name:user.name, child_id:replyTo.child_id, child_name:replyTo.child_name,
                   to_teacher:replyTo.to_teacher, tmima:replyTo.tmima,
-                  text:replyText, date:TODAY, time:new Date().toLocaleTimeString("el-GR",{hour:"2-digit",minute:"2-digit"}), read:true,
+                  text:replyText, date:TODAY, time:nowTime(), read:true,
                 });
                 setReplyTo(null); setReplyText("");
                 alert("✅ Η απάντηση εστάλη!");
@@ -3289,44 +3452,66 @@ function Epikoinonia({user, onNewParentMsg}) {
         </div>
       )}
 
-      {/* ── ΑΝΑΚΟΙΝΩΣΕΙΣ (admin/secretary) ── */}
-      {tab==="inbox"&&(user.role==="admin"||user.role==="secretary")&&(
-      <div className="card">
-        {msgs.map(m=>(
-          <div key={m.id} style={{padding:"14px 16px",borderRadius:12,border:`1.5px solid ${nc[m.type]||"var(--beige3)"}`,marginBottom:9,background:nc[m.type]||"var(--white)"}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
-              <div style={{display:"flex",alignItems:"center",gap:8}}>
-                <span style={{fontSize:16}}>{ni[m.type]||"📢"}</span>
-                <span style={{fontFamily:"Playfair Display,serif",fontWeight:600,fontSize:14}}>{m.subject}</span>
-                {!m.read&&<span className="badge b-green" style={{fontSize:9}}>Νέο</span>}
-              </div>
-              <span style={{fontSize:11,color:"var(--text3)"}}>{m.date}</span>
-            </div>
-            <div style={{fontSize:13,color:"var(--text2)",marginBottom:4}}>{m.body}</div>
-            <div style={{fontSize:11,color:"var(--text3)"}}>Από: {m.from}</div>
-          </div>
-        ))}
-      </div>
-      )}
-      {sc&&(
-        <div className="modal-bg" onClick={e=>e.target===e.currentTarget&&setSc(false)}>
+      {/* ΝΕΟ ΜΗΝΥΜΑ: σε έναν γονέα ή σε ομάδα γονέων */}
+      {showCompose&&(
+        <div className="modal-bg" onClick={e=>e.target===e.currentTarget&&setShowCompose(false)}>
           <div className="modal">
-            <div className="modal-title">Νέο μήνυμα<button className="modal-close" onClick={()=>setSc(false)}>✕</button></div>
-            <div className="fgroup"><label className="flabel">Προς</label>
-              <select className="finput" value={nm.to} onChange={e=>setNm({...nm,to:e.target.value})}>
-                <option value="">Επιλέξτε...</option>
-                <option value="all">📢 Όλοι οι γονείς</option>
-                {TMIMATA.map(t=><option key={t.id} value={t.id}>Γονείς {t.name}</option>)}
-              </select>
+            <div className="modal-title">✉️ Νέο μήνυμα προς γονείς<button className="modal-close" onClick={()=>setShowCompose(false)}>✕</button></div>
+
+            <div style={{display:"flex",gap:8,marginBottom:14}}>
+              <button className={`btn ${mode==="one"?"btn-primary":"btn-ghost"}`} style={{flex:1,justifyContent:"center"}} onClick={()=>setMode("one")}>👤 Σε έναν γονέα</button>
+              <button className={`btn ${mode==="group"?"btn-primary":"btn-ghost"}`} style={{flex:1,justifyContent:"center"}} onClick={()=>setMode("group")}>👥 Σε ομάδα γονέων</button>
             </div>
-            <div className="fgroup"><label className="flabel">Κατηγορία</label>
-              <select className="finput" value={nm.type} onChange={e=>setNm({...nm,type:e.target.value})}>
-                <option value="general">📢 Γενική</option><option value="financial">💰 Οικονομικά</option><option value="route">🚌 Δρομολόγιο</option><option value="thematic">📚 Θεματική</option>
-              </select>
+
+            {mode==="one"&&(
+              <div className="fgroup"><label className="flabel">Γονέας του παιδιού</label>
+                <select className="finput" value={oneKid} onChange={e=>setOneKid(e.target.value)}>
+                  <option value="">Επιλέξτε παιδί…</option>
+                  {mine.map(c=><option key={c.id} value={c.id}>{c.name}{!isTeacher&&tmName(c.tmima)?` — ${tmName(c.tmima)}`:""}</option>)}
+                </select>
+              </div>
+            )}
+
+            {mode==="group"&&(<>
+              <div className="fgroup"><label className="flabel">Ομάδα</label>
+                <select className="finput" value={grp} onChange={e=>setGrp(e.target.value)}>
+                  <option value="">Επιλέξτε ομάδα…</option>
+                  {!isTeacher&&<option value="all">📢 Όλοι οι γονείς ({mine.length})</option>}
+                  {tms.map(t=><option key={t.id} value={"t:"+t.id}>Γονείς {t.name} ({mine.filter(c=>c.tmima===t.id).length})</option>)}
+                  <option value="pick">☑️ Επιλογή συγκεκριμένων γονέων…</option>
+                </select>
+              </div>
+              {grp==="pick"&&(
+                <div style={{marginBottom:14}}>
+                  <input className="finput" placeholder="Αναζήτηση παιδιού…" value={kidSearch} onChange={e=>setKidSearch(e.target.value)} style={{marginBottom:8}}/>
+                  <div style={{maxHeight:200,overflowY:"auto",border:"1.5px solid var(--beige3)",borderRadius:10,padding:"6px 10px"}}>
+                    {shown.length===0&&<div style={{fontSize:12,color:"var(--text3)",padding:8}}>Δεν βρέθηκαν παιδιά.</div>}
+                    {shown.map(c=>(
+                      <label key={c.id} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 2px",fontSize:13,cursor:"pointer"}}>
+                        <input type="checkbox" checked={picked.has(c.id)} onChange={()=>togglePick(c.id)}/>
+                        <span>{c.name}</span>
+                        {!isTeacher&&<span style={{marginLeft:"auto",fontSize:11,color:"var(--text3)"}}>{tmName(c.tmima)}</span>}
+                      </label>
+                    ))}
+                  </div>
+                  <div style={{display:"flex",gap:8,marginTop:6}}>
+                    <button className="btn btn-ghost btn-xs" onClick={()=>setPicked(p=>{ const n=new Set(p); shown.forEach(c=>n.add(c.id)); return n; })}>Επιλογή όλων που εμφανίζονται</button>
+                    <button className="btn btn-ghost btn-xs" onClick={()=>setPicked(new Set())}>Καθαρισμός</button>
+                  </div>
+                </div>
+              )}
+            </>)}
+
+            <div style={{fontSize:12,color:targets.length?"var(--green)":"var(--text3)",fontWeight:600,marginBottom:10}}>
+              {targets.length?`Παραλήπτες: ${targets.length} ${targets.length===1?"γονέας":"γονείς"}`:"Δεν έχουν επιλεγεί παραλήπτες"}
             </div>
-            <div className="fgroup"><label className="flabel">Θέμα</label><input className="finput" value={nm.subject} onChange={e=>setNm({...nm,subject:e.target.value})}/></div>
-            <div className="fgroup"><label className="flabel">Μήνυμα</label><textarea className="finput" rows={5} value={nm.body} onChange={e=>setNm({...nm,body:e.target.value})} style={{resize:"vertical",width:"100%"}}/></div>
-            <div style={{display:"flex",gap:10}}><button className="btn btn-primary" style={{flex:1}} onClick={send}>📤 Αποστολή</button><button className="btn btn-ghost" onClick={()=>setSc(false)}>Ακύρωση</button></div>
+            <div className="fgroup"><label className="flabel">Μήνυμα</label>
+              <textarea className="finput" rows={5} value={body} onChange={e=>setBody(e.target.value)} placeholder="Γράψτε το μήνυμά σας…" style={{resize:"vertical",width:"100%"}}/>
+            </div>
+            <div style={{display:"flex",gap:10}}>
+              <button className="btn btn-primary" style={{flex:1}} disabled={sending||!body.trim()||!targets.length} onClick={send}>{sending?"Αποστολή…":"📤 Αποστολή"}</button>
+              <button className="btn btn-ghost" onClick={()=>setShowCompose(false)}>Ακύρωση</button>
+            </div>
           </div>
         </div>
       )}
@@ -3336,7 +3521,10 @@ function Epikoinonia({user, onNewParentMsg}) {
 
 // ─── PORTAL ΓΟΝΕΑ ────────────────────────────────────────────────────────────
 function ParentPortal({user, kids}) {
-  const child = kids.find(c=>c.id===user.child_id);
+  const myIds = ((user.child_ids&&user.child_ids.length)?user.child_ids:[user.child_id]).map(Number);
+  const myKids = kids.filter(c=>myIds.includes(Number(c.id)));
+  const [selChild,setSelChild] = useState(null);
+  const child = myKids.find(c=>c.id===selChild) || myKids[0];
   const [tab,setTab] = useState("deltion");
   const [msg,setMsg] = useState(""), [sent,setSent] = useState([]);
   // Η συνομιλία του γονέα: τα δικά του μηνύματα και οι απαντήσεις του προσωπικού (αποθηκεύονται στη βάση)
@@ -3378,9 +3566,16 @@ function ParentPortal({user, kids}) {
             <div>
               <div style={{fontSize:11,opacity:.7,marginBottom:3,letterSpacing:".05em",textTransform:"uppercase"}}>Το παιδί μου</div>
               <div style={{fontFamily:"Playfair Display,serif",fontSize:24,fontWeight:700}}>{child.name}</div>
-              <div style={{fontSize:12,opacity:.75,marginTop:3}}>🏡 {t?.name} · {t?.teacher}</div>
+              <div style={{fontSize:12,opacity:.75,marginTop:3}}>🏡 {t?.name}{t?.teacher?` · ${t.teacher}`:""}</div>
             </div>
           </div>
+          {myKids.length>1&&(
+            <div style={{display:"flex",gap:8,flexWrap:"wrap",marginTop:14}}>
+              {myKids.map(k=>(
+                <button key={k.id} onClick={()=>setSelChild(k.id)} style={{border:"1.5px solid rgba(255,255,255,.55)",background:k.id===child.id?"#fff":"transparent",color:k.id===child.id?"var(--green)":"#fff",borderRadius:999,padding:"6px 14px",fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>{k.name.split(" ")[0]}</button>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="parent-tabs" style={{flexWrap:"wrap"}}>
@@ -3395,13 +3590,19 @@ function ParentPortal({user, kids}) {
           <div className="card">
             <div style={{fontFamily:"Playfair Display,serif",fontWeight:600,fontSize:16,color:"var(--green)",marginBottom:16}}>📅 Δελτίο {new Date().toLocaleDateString("el-GR",{day:"numeric",month:"long"})}</div>
             <div className="g2" style={{marginBottom:12}}>
-              {[["🌅 Πρωινό",rep.prwino],["☀️ Μεσημεριανό",rep.mesimeri],["🌇 Απογευματινό",rep.apogeyma],["😴 Ύπνος",rep.ypnos]].map(([l,v])=>(
+              {[["🌅 Πρωινό",rep.prwino],["☀️ Μεσημεριανό",rep.mesimeri],["🌇 Απογευματινό",rep.apogeyma]].map(([l,v])=>(
                 <div key={l} className="report-block">
                   <div className="report-key">{l}</div>
                   <div className="report-val"><span style={{fontSize:22}}>{fe(v)}</span>{v}</div>
                 </div>
               ))}
             </div>
+            {(()=>{ const nr=normReport(rep); const slept=nr.ypnos==="Ναι"; return (
+              <div className="report-block" style={{marginBottom:10}}>
+                <div className="report-key"><Ico n="moon" s={16}/>Ύπνος</div>
+                <div className="report-val"><span style={{fontSize:22}}>{slept?"😴":"🙂"}</span>{slept?"Κοιμήθηκε":"Δεν κοιμήθηκε"}</div>
+                {nr.ypnos_notes&&<div style={{fontSize:13,color:"var(--text2)",marginTop:6}}>{nr.ypnos_notes}</div>}
+              </div>); })()}
             <div className="report-block" style={{marginBottom:10}}>
               <div className="report-key"><Ico n="palette" s={16}/>Δραστηριότητα</div>
               <div className="report-val"><span style={{fontSize:22}}>{rep.drastiriotita?"✅":"❌"}</span>{rep.drastiriotita?"Συμμετείχε κανονικά":"Δεν συμμετείχε"}</div>
@@ -3847,6 +4048,22 @@ function Dromologia() {
 }
 
 // ─── ΟΙΚΟΝΟΜΙΚΑ ──────────────────────────────────────────────────────────────
+function downloadCSV(name, rows){
+  const esc = v => `"${String(v??"").replace(/"/g,'""')}"`;
+  const csv = "\uFEFF" + rows.map(r=>r.map(esc).join(";")).join("\r\n");   // ; ώστε το ελληνικό Excel να σπάει σωστά τις στήλες
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));
+  a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1500);
+}
+function AmountEdit({ value, onSave, editable }) {
+  const [ed,setEd] = useState(false); const [v,setV] = useState("");
+  const base = {fontFamily:"Playfair Display,serif",fontWeight:700,fontSize:15};
+  if(!editable) return <div style={base}>{Number(value)||0}€</div>;
+  if(!ed) return <div style={{...base,cursor:"pointer"}} title="Κλικ για αλλαγή ποσού" onClick={()=>{setV(String(value??0));setEd(true);}}>{Number(value)||0}€ <span style={{fontSize:11,opacity:.45}}>✏️</span></div>;
+  const commit = () => { const n = Number(String(v).replace(",",".")); if(Number.isFinite(n) && n>=0 && n!==Number(value)) onSave(n); setEd(false); };
+  return <input autoFocus type="number" min="0" step="1" className="finput" style={{width:90,padding:"4px 8px"}} value={v} onChange={e=>setV(e.target.value)} onBlur={commit} onKeyDown={e=>{ if(e.key==="Enter") commit(); if(e.key==="Escape") setEd(false); }}/>;
+}
 const EXODA_CATEGORIES = [
   "ΑΠΔ","ΚΕΑΟ","ΦΜΥ","ΤΕΚΑ","ΕΝΦΙΑ","ΕΦΚΑ","ΕΦΟΡΙΑ","ΑΣΦΑΛΕΙΕΣ","ΑΣΦΑΛΕΙΑ ΣΧΟΛΙΚΟΥ",
   "ΛΟΓΙΣΤΗΣ","ΡΕΥΜΑ","ΝΕΡΟ","ΑΕΡΙΟ","ΤΡΟΦΙΜΑ","ΚΑΘΑΡΙΣΤΙΚΑ","ΕΝΟΙΚΙΟ",
@@ -3864,16 +4081,50 @@ function Oikonomika({user, kids, setKids}) {
   const [newEx, setNewEx] = useState({aitia:"ΑΠΔ", poso:"", date:"", notes:""});
 
   const filt = kids.filter(c=>(fs==="all"||c.didaktra===fs)&&(ft==="all"||c.tmima===ft));
-  const paid = kids.filter(c=>c.didaktra==="paid").reduce((s,c)=>s+c.amount,0);
-  const pend = kids.filter(c=>c.didaktra==="pending").reduce((s,c)=>s+c.amount,0);
+  const paid = kids.filter(c=>c.didaktra==="paid").reduce((s,c)=>s+(Number(c.amount)||0),0);
+  const pend = kids.filter(c=>c.didaktra==="pending").reduce((s,c)=>s+(Number(c.amount)||0),0);
+  const isAdmin = user.role==="admin";
 
   const monthExoda = exoda.filter(e=>e.month===selMonth);
   const totalExoda = monthExoda.reduce((s,e)=>s+Number(e.poso),0);
 
-  const addExodo = () => {
+  const [exEditId,setExEditId] = useState(null);
+  const [exErr,setExErr] = useState("");
+  useEffect(()=>{
+    if(DEMO || !sb || user.role!=="admin") return;
+    let alive = true;
+    sb.from("expenses").select("*").order("date",{ascending:true}).then(({data,error})=>{
+      if(!alive) return;
+      if(error){ setExErr(error.message||"σφάλμα"); return; }
+      setExoda(data.map(r=>({ id:r.id, month:r.month, aitia:r.aitia, poso:Number(r.poso), date:r.date||"", notes:r.notes||"" })));
+    });
+    return ()=>{ alive=false; };
+  },[]);
+  const openExodo = (e) => {
+    if(e){ setExEditId(e.id); setNewEx({ aitia:e.aitia, poso:String(e.poso), date:e.date||"", notes:e.notes||"" }); }
+    else { setExEditId(null); setNewEx({aitia:"ΑΠΔ",poso:"",date:"",notes:""}); }
+    setShowAddExodo(true);
+  };
+  const saveExodo = async () => {
     if(!newEx.poso||!newEx.date) return;
-    setExoda([...exoda,{...newEx,id:Date.now(),month:selMonth,poso:Number(newEx.poso)}]);
-    setShowAddExodo(false); setNewEx({aitia:"ΑΠΔ",poso:"",date:"",notes:""});
+    const row = { aitia:newEx.aitia, poso:Number(newEx.poso), date:newEx.date, notes:newEx.notes||"" };
+    const useDb = !DEMO && sb && !exErr;
+    try {
+      if(exEditId){
+        if(useDb){ const { error } = await sb.from("expenses").update(row).eq("id",exEditId); if(error) throw error; }
+        setExoda(prev=>prev.map(e=>e.id===exEditId?{...e,...row}:e));
+      } else if(useDb){
+        const { data, error } = await sb.from("expenses").insert({ month:selMonth, ...row }).select().single();
+        if(error) throw error;
+        setExoda(prev=>[...prev,{ id:data.id, month:data.month, ...row }]);
+      } else setExoda(prev=>[...prev,{ id:Date.now(), month:selMonth, ...row }]);
+    } catch(e){ alert("⚠️ Το έξοδο δεν αποθηκεύτηκε: "+e.message); return; }
+    setShowAddExodo(false); setExEditId(null); setNewEx({aitia:"ΑΠΔ",poso:"",date:"",notes:""});
+  };
+  const delExodo = async (e) => {
+    if(!window.confirm("Διαγραφή αυτού του εξόδου;")) return;
+    if(!DEMO && sb && !exErr){ const { error } = await sb.from("expenses").delete().eq("id",e.id); if(error){ alert("⚠️ "+error.message); return; } }
+    setExoda(prev=>prev.filter(x=>x.id!==e.id));
   };
 
   // Group expenses by category for summary
@@ -3906,6 +4157,11 @@ function Oikonomika({user, kids, setKids}) {
       {/* ── ΔIΔΑΚΤΡΑ ── */}
       {oikTab==="didaktra"&&(
         <>
+          {!isAdmin&&(
+            <div style={{background:"var(--beige)",borderRadius:10,padding:"10px 14px",marginBottom:14,fontSize:12,color:"var(--text3)"}}>
+              ℹ️ Προβολή μόνο: τα ποσά και η κατάσταση πληρωμής αλλάζουν αποκλειστικά από τη Διοίκηση.
+            </div>
+          )}
           <div className="g3" style={{marginBottom:20}}>
             <StatCard icon="€" bg="#ECFDF5" value={`${paid}€`} label="Εισπραχθέντα μήνα" trend="↑" up/>
             <StatCard icon="⏳" bg="#FFFBEB" value={`${pend}€`} label="Εκκρεμείς" trend={`${kids.filter(c=>c.didaktra==="pending").length} παιδιά`} up={false}/>
@@ -3919,7 +4175,7 @@ function Oikonomika({user, kids, setKids}) {
               <option value="all">Όλα τα τμήματα</option>
               {TMIMATA.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}
             </select>
-            <button className="btn btn-ghost" style={{marginLeft:"auto"}} onClick={()=>alert("Η εξαγωγή σε Excel θα ενεργοποιηθεί μαζί με τη μόνιμη αποθήκευση δεδομένων (Supabase).")}>📊 Εξαγωγή Excel</button>
+            <button className="btn btn-ghost" style={{marginLeft:"auto"}} onClick={()=>downloadCSV(`didaktra-${TODAY}.csv`,[["Παιδί","Τμήμα","Πατέρας","Μητέρα","Ποσό (€)","Κατάσταση"],...filt.map(c=>[c.name,tmName(c.tmima),c.pat_name||"",c.mit_name||"",Number(c.amount)||0,c.didaktra==="paid"?"Πληρωμένο":"Εκκρεμεί"])])}>📊 Εξαγωγή Excel</button>
           </div>
           <div className="card">
             <div style={{overflowX:"auto"}}>
@@ -3935,10 +4191,10 @@ function Oikonomika({user, kids, setKids}) {
                 <div key={c.id} className="fin-row" style={{background:i%2===0?"var(--beige)":"var(--white)"}}>
                   <div><div style={{fontWeight:600,fontSize:13}}>{c.name}</div><div style={{fontSize:11,color:"var(--text3)"}}>{c.pat_name||c.goneas1}</div></div>
                   <div><span className="badge b-earth" style={{fontSize:10}}>{t?.name}</span></div>
-                  <div style={{fontFamily:"Playfair Display,serif",fontWeight:700,fontSize:15}}>{c.amount}€</div>
+                  <AmountEdit value={c.amount} editable={isAdmin} onSave={n=>setKids(prev=>prev.map(k=>k.id===c.id?{...k,amount:n}:k))}/>
                   <div><span className={`badge ${c.didaktra==="paid"?"b-green":"b-amber"}`}>{c.didaktra==="paid"?"✓ Πληρωμένο":"Εκκρεμεί"}</span></div>
                   <div style={{display:"flex",gap:5}}>
-                    {c.didaktra==="pending"&&<button className="btn btn-ghost btn-xs" title="Σήμανση ως πληρωμένο" onClick={()=>setKids(kids.map(k=>k.id===c.id?{...k,didaktra:"paid"}:k))}>✓</button>}
+                    {isAdmin&&<button className="btn btn-ghost btn-xs" title={c.didaktra==="pending"?"Σήμανση ως πληρωμένο":"Επαναφορά σε εκκρεμές"} onClick={()=>setKids(prev=>prev.map(k=>k.id===c.id?{...k,didaktra:c.didaktra==="pending"?"paid":"pending"}:k))}>{c.didaktra==="pending"?"✓":"↩"}</button>}
                     <button className="btn btn-ghost btn-xs" title="Εκτύπωση απόδειξης" onClick={()=>window.print()}>🖨️</button>
                   </div>
                 </div>
@@ -3953,13 +4209,18 @@ function Oikonomika({user, kids, setKids}) {
       {/* ── ΕΞΟΔΑ (admin only) ── */}
       {oikTab==="exoda"&&user.role==="admin"&&(
         <>
+          {exErr&&(
+            <div style={{background:"#FEF2F2",border:"1px solid #F3C9C9",borderRadius:12,padding:"10px 14px",marginBottom:14,fontSize:12,color:"#991B1B"}}>
+              ⚠️ Τα έξοδα δεν αποθηκεύονται ακόμα μόνιμα: λείπει το SQL «Βήμα 9» από το Supabase. Μέχρι τότε χάνονται με την ανανέωση της σελίδας.
+            </div>
+          )}
           <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:20,flexWrap:"wrap"}}>
             <select className="select" value={selMonth} onChange={e=>setSelMonth(e.target.value)}>
               {MONTHS.map(m=><option key={m.val} value={m.val}>{m.label}</option>)}
             </select>
             <div style={{marginLeft:"auto",display:"flex",gap:10}}>
-              <button className="btn btn-ghost" onClick={()=>alert("Η εξαγωγή σε Excel θα ενεργοποιηθεί μαζί με τη μόνιμη αποθήκευση δεδομένων (Supabase).")}>📊 Εξαγωγή Excel</button>
-              <button className="btn btn-primary" onClick={()=>setShowAddExodo(true)}>+ Νέο έξοδο</button>
+              <button className="btn btn-ghost" onClick={()=>downloadCSV(`exoda-${selMonth}.csv`,[["Αιτιολογία","Ποσό (€)","Ημερομηνία","Σημείωση"],...monthExoda.map(e=>[e.aitia,Number(e.poso)||0,e.date||"",e.notes||""])])}>📊 Εξαγωγή Excel</button>
+              <button className="btn btn-primary" onClick={()=>openExodo(null)}>+ Νέο έξοδο</button>
             </div>
           </div>
 
@@ -4001,7 +4262,8 @@ function Oikonomika({user, kids, setKids}) {
                 <div style={{fontSize:12,color:"var(--text2)"}}>{e.date?new Date(e.date).toLocaleDateString("el-GR"):"-"}</div>
                 <div style={{fontSize:12,color:"var(--text3)",fontStyle:e.notes?"normal":"italic"}}>{e.notes||"-"}</div>
                 <div style={{display:"flex",gap:4}}>
-                  <button className="btn btn-ghost btn-xs" onClick={()=>setExoda(exoda.filter(x=>x.id!==e.id))}>🗑️</button>
+                  <button className="btn btn-ghost btn-xs" title="Επεξεργασία" onClick={()=>openExodo(e)}>✏️</button>
+                  <button className="btn btn-ghost btn-xs" title="Διαγραφή" onClick={()=>delExodo(e)}>🗑️</button>
                 </div>
               </div>
             ))}
@@ -4033,7 +4295,7 @@ function Oikonomika({user, kids, setKids}) {
           {showAddExodo&&(
             <div className="modal-bg" onClick={e=>e.target===e.currentTarget&&setShowAddExodo(false)}>
               <div className="modal">
-                <div className="modal-title">Νέο έξοδο — {MONTHS.find(m=>m.val===selMonth)?.label}<button className="modal-close" onClick={()=>setShowAddExodo(false)}>✕</button></div>
+                <div className="modal-title">{exEditId?"Επεξεργασία εξόδου":"Νέο έξοδο"} — {MONTHS.find(m=>m.val===selMonth)?.label}<button className="modal-close" onClick={()=>setShowAddExodo(false)}>✕</button></div>
                 <div className="fgroup">
                   <label className="flabel">Κατηγορία / Αιτιολογία *</label>
                   <select className="finput" value={newEx.aitia} onChange={e=>setNewEx({...newEx,aitia:e.target.value})}>
@@ -4055,7 +4317,7 @@ function Oikonomika({user, kids, setKids}) {
                   <input className="finput" value={newEx.notes} onChange={e=>setNewEx({...newEx,notes:e.target.value})} placeholder="π.χ. Γιώτα, Αυγούστου, κλπ"/>
                 </div>
                 <div style={{display:"flex",gap:10}}>
-                  <button className="btn btn-primary" style={{flex:1}} onClick={addExodo}>💾 Αποθήκευση</button>
+                  <button className="btn btn-primary" style={{flex:1}} onClick={saveExodo}>💾 Αποθήκευση</button>
                   <button className="btn btn-ghost" onClick={()=>setShowAddExodo(false)}>Ακύρωση</button>
                 </div>
               </div>
@@ -4097,14 +4359,239 @@ function Oikonomika({user, kids, setKids}) {
   );
 }
 
-// ─── ΑΝΑΦΟΡΕΣ ────────────────────────────────────────────────────────────────
-function Anafores({kids}) {
-  const hasKids = kids.length>0;
-  const p=kids.filter(c=>c.present).length;
-  const paid=kids.filter(c=>c.didaktra==="paid").length;
-  const rev=kids.filter(c=>c.didaktra==="paid").reduce((s,c)=>s+c.amount,0);
+// ─── ΤΜΗΜΑΤΑ (μόνο Διοίκηση) ─────────────────────────────────────────────────
+function Tmimata({ user, kids, setKids, users, reload, onDeleteKid }) {
+  const [edit,setEdit] = useState(null);       // null ή η φόρμα τμήματος
+  const [moveFrom,setMoveFrom] = useState(null);
+  const [moveTo,setMoveTo] = useState("");
+  const [busy,setBusy] = useState(false);
+  const noDb = !DEMO && !!TM_STATE.error;       // ο πίνακας «tmimata» λείπει ακόμα από τη βάση
+  const teachers = users.filter(u=>u.role==="teacher");
+  const parents  = users.filter(u=>u.role==="parent");
+
+  const openNew  = () => setEdit({ isNew:true, id:"", name:"", type:"paidiko", teacher:"", color:TM_COLORS[TMIMATA.length % TM_COLORS.length], fee:"280" });
+  const openEdit = (t) => setEdit({ isNew:false, ...t, fee:String(t.fee??0) });
+  const dbErr = (e) => alert("⚠️ "+(/relation|does not exist|schema cache/i.test(e.message||"") ? "Ο πίνακας τμημάτων δεν υπάρχει ακόμα στη βάση. Τρέξτε πρώτα το SQL «Βήμα 9» στο Supabase." : e.message));
+
+  const save = async () => {
+    const name = edit.name.trim();
+    if(!name){ alert("Γράψτε όνομα τμήματος."); return; }
+    if(TMIMATA.some(t=>t.id!==edit.id && t.name.trim().toLowerCase()===name.toLowerCase())){ alert("Υπάρχει ήδη τμήμα με αυτό το όνομα."); return; }
+    const fee = Number(String(edit.fee).replace(",","."));
+    if(!Number.isFinite(fee) || fee<0){ alert("Γράψτε έγκυρο ποσό διδάκτρων (ή 0)."); return; }
+    const row = { name, type:edit.type, teacher:(edit.teacher||"").trim(), color:edit.color, fee };
+    setBusy(true);
+    try {
+      if(DEMO){
+        if(edit.isNew) TMIMATA.push({ id:"t-"+Date.now().toString(36), ...row });
+        else { const i=TMIMATA.findIndex(t=>t.id===edit.id); if(i>=0) TMIMATA[i]={ ...TMIMATA[i], ...row }; }
+      } else if(edit.isNew){
+        const { error } = await sb.from("tmimata").insert({ id:"t-"+Date.now().toString(36), sort:TMIMATA.length+1, ...row });
+        if(error) throw error;
+      } else {
+        const { error } = await sb.from("tmimata").update(row).eq("id",edit.id);
+        if(error) throw error;
+      }
+      await reload(); setEdit(null);
+    } catch(e){ dbErr(e); }
+    finally { setBusy(false); }
+  };
+
+  const del = async (t) => {
+    const n = kids.filter(c=>c.tmima===t.id).length;
+    if(n>0){ alert(`Το τμήμα «${t.name}» έχει ακόμα ${n} παιδιά.\nΜεταφέρετε πρώτα τα παιδιά σε άλλο τμήμα (κουμπί «Μεταφορά παιδιών»).`); return; }
+    const tn = teachers.filter(u=>u.tmima_id===t.id).length;
+    if(tn>0){ alert(`Στο τμήμα «${t.name}» είναι συνδεδεμένες ${tn} δασκάλες.\nΑλλάξτε πρώτα το τμήμα τους από τη σελίδα «Χρήστες».`); return; }
+    if(!window.confirm(`Διαγραφή του τμήματος «${t.name}»;`)) return;
+    setBusy(true);
+    try {
+      if(DEMO){ const i=TMIMATA.findIndex(x=>x.id===t.id); if(i>=0) TMIMATA.splice(i,1); }
+      else { const { error } = await sb.from("tmimata").delete().eq("id",t.id); if(error) throw error; }
+      await reload();
+    } catch(e){ dbErr(e); }
+    finally { setBusy(false); }
+  };
+
+  const doMove = () => {
+    if(!moveFrom || !moveTo || moveTo===moveFrom.id) return;
+    const n = kids.filter(c=>c.tmima===moveFrom.id).length;
+    if(!window.confirm(`Να μεταφερθούν ${n} παιδιά από «${moveFrom.name}» στο «${tmName(moveTo)}»;`)) return;
+    setKids(prev=>prev.map(c=>c.tmima===moveFrom.id?{...c,tmima:moveTo}:c));
+    setMoveFrom(null); setMoveTo("");
+  };
+
+  // ── ΕΛΕΓΧΟΣ ΑΝΤΙΣΤΟΙΧΙΑΣ: παιδιά ↔ τμήματα ↔ δασκάλες ↔ γονείς ──
+  const tmIds = new Set(TMIMATA.map(t=>t.id));
+  const kidIds = new Set(kids.map(c=>c.id));
+  const issues = [];
+  kids.filter(c=>!tmIds.has(c.tmima)).forEach(c=>issues.push({ sev:"err", text:`Το παιδί «${c.name}» ανήκει σε τμήμα που δεν υπάρχει.`, kid:c }));
+  teachers.filter(u=>!tmIds.has(u.tmima_id)).forEach(u=>issues.push({ sev:"err", text:`Η δασκάλα «${u.name}» (${u.username}) δεν είναι συνδεδεμένη με υπάρχον τμήμα, οπότε δεν βλέπει κανένα παιδί. Διορθώστε το από «Χρήστες».` }));
+  TMIMATA.forEach(t=>{
+    const kn = kids.filter(c=>c.tmima===t.id).length, tn = teachers.filter(u=>u.tmima_id===t.id).length;
+    if(kn>0 && tn===0) issues.push({ sev:"warn", text:`Το τμήμα «${t.name}» έχει ${kn} παιδιά αλλά δεν έχει λογαριασμό δασκάλας.` });
+  });
+  parents.forEach(u=>{
+    const ids = childIdsOf(u);
+    if(!ids.length) issues.push({ sev:"err", text:`Ο γονέας «${u.name}» (${u.username}) δεν είναι συνδεδεμένος με κανένα παιδί.` });
+    ids.filter(id=>!kidIds.has(id)).forEach(id=>issues.push({ sev:"err", text:`Ο γονέας «${u.name}» (${u.username}) είναι συνδεδεμένος με παιδί που δεν υπάρχει στο Μητρώο.` }));
+  });
+  const linked = new Set(parents.flatMap(u=>childIdsOf(u)));
+  const noParent = kids.filter(c=>!linked.has(Number(c.id)));
+  if(noParent.length) issues.push({ sev:"info", text:`${noParent.length} παιδιά δεν έχουν λογαριασμό γονέα: ${noParent.slice(0,8).map(c=>c.name).join(", ")}${noParent.length>8?"…":""}` });
+  const norm = (s)=>String(s||"").trim().toLowerCase().replace(/\s+/g," ");
+  const byKey = new Map();
+  kids.forEach(c=>{ const k=norm(c.name)+"|"+(c.birthdate||""); if(!byKey.has(k)) byKey.set(k,[]); byKey.get(k).push(c); });
+  const dups = [...byKey.values()].filter(g=>g.length>1);
+  dups.forEach(g=>issues.push({ sev:"warn", text:`Πιθανό διπλότυπο: «${g[0].name}» υπάρχει ${g.length} φορές.`, dup:g }));
+  const problems = issues.filter(i=>i.sev!=="info").length;
+
+  const sevStyle = { err:{bg:"#FEF2F2",bd:"#F3C9C9",ic:"⛔"}, warn:{bg:"#FFFBEB",bd:"#F5E3B3",ic:"⚠️"}, info:{bg:"var(--beige)",bd:"var(--beige3)",ic:"ℹ️"} };
+
   return (
     <div className="page-in">
+      {noDb&&(
+        <div style={{background:"#FEF2F2",border:"1px solid #F3C9C9",borderRadius:12,padding:"12px 16px",marginBottom:16,fontSize:13,color:"#991B1B"}}>
+          ⚠️ Τα τμήματα δεν μπορούν ακόμα να αποθηκευτούν: λείπει το SQL «Βήμα 9» από τη βάση (Supabase → SQL Editor). Μέχρι τότε χρησιμοποιούνται τα 5 αρχικά τμήματα.
+        </div>
+      )}
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16,flexWrap:"wrap"}}>
+        <div style={{fontSize:13,color:"var(--text3)",flex:1,minWidth:200}}>Δεν υπάρχει όριο παιδιών ανά τμήμα. Εδώ ορίζετε ονόματα, δασκάλες και το προεπιλεγμένο δίδακτρο για νέα παιδιά.</div>
+        <button className="btn btn-primary" onClick={openNew} disabled={noDb}>+ Νέο τμήμα</button>
+      </div>
+
+      <div className="card" style={{marginBottom:20}}>
+        {TMIMATA.map(t=>{
+          const kn = kids.filter(c=>c.tmima===t.id).length;
+          const tAcc = teachers.filter(u=>u.tmima_id===t.id);
+          return (
+            <div key={t.id} style={{display:"flex",alignItems:"center",gap:14,padding:"14px 6px",borderBottom:"1px solid var(--beige3)",flexWrap:"wrap"}}>
+              <div style={{width:14,height:14,borderRadius:5,background:t.color,flexShrink:0}}/>
+              <div style={{flex:1,minWidth:180}}>
+                <div style={{fontWeight:700,fontSize:14}}>{t.name} <span className="badge b-gray" style={{fontSize:10,marginLeft:6}}>{t.type==="vrefiko"?"Βρεφικό":"Παιδικό"}</span></div>
+                <div style={{fontSize:12,color:"var(--text3)",marginTop:3}}>
+                  {t.teacher?`Δασκάλα: ${t.teacher} · `:""}Λογαριασμός: {tAcc.length?tAcc.map(u=>u.name).join(", "):"— κανένας"}
+                </div>
+              </div>
+              <div style={{textAlign:"center",minWidth:70}}><div style={{fontFamily:"Playfair Display,serif",fontSize:20,fontWeight:700,color:"var(--green)"}}>{kn}</div><div style={{fontSize:10,color:"var(--text3)"}}>παιδιά</div></div>
+              <div style={{textAlign:"center",minWidth:70}}><div style={{fontFamily:"Playfair Display,serif",fontSize:16,fontWeight:700}}>{t.fee||0}€</div><div style={{fontSize:10,color:"var(--text3)"}}>προεπιλογή</div></div>
+              <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                <button className="btn btn-ghost btn-xs" onClick={()=>openEdit(t)} disabled={noDb}>✏️ Επεξεργασία</button>
+                <button className="btn btn-ghost btn-xs" onClick={()=>{setMoveFrom(t);setMoveTo("");}} disabled={kn===0}>↪️ Μεταφορά παιδιών</button>
+                <button className="btn btn-ghost btn-xs" style={{color:"#B91C1C"}} onClick={()=>del(t)} disabled={noDb||busy}>🗑️</button>
+              </div>
+            </div>
+          );
+        })}
+        {TMIMATA.length===0&&<div style={{padding:24,textAlign:"center",color:"var(--text3)",fontSize:13}}>Δεν υπάρχουν τμήματα. Πατήστε «+ Νέο τμήμα».</div>}
+      </div>
+
+      <div className="card">
+        <div className="card-title"><Ico n="check" s={16}/>Έλεγχος αντιστοιχίας παιδιών · τμημάτων · δασκάλων · γονέων</div>
+        {problems===0 ? (
+          <div style={{background:"#ECFDF5",border:"1px solid #BFE9D3",borderRadius:10,padding:"12px 14px",fontSize:13,color:"#065F46",marginBottom:issues.length?10:0}}>
+            ✅ Όλα συμφωνούν: κάθε παιδί ανήκει σε υπάρχον τμήμα και κάθε λογαριασμός δασκάλας/γονέα δείχνει σε σωστά δεδομένα.
+          </div>
+        ) : (
+          <div style={{fontSize:12,color:"var(--text3)",marginBottom:10}}>Βρέθηκαν {problems} σημεία που θέλουν προσοχή:</div>
+        )}
+        {issues.map((i,idx)=>(
+          <div key={idx} style={{background:sevStyle[i.sev].bg,border:`1px solid ${sevStyle[i.sev].bd}`,borderRadius:10,padding:"10px 14px",marginBottom:8,fontSize:13}}>
+            <div style={{display:"flex",gap:8}}><span>{sevStyle[i.sev].ic}</span><span style={{flex:1}}>{i.text}</span></div>
+            {i.kid&&(
+              <div style={{marginTop:8,display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+                <select className="select" defaultValue="" onChange={e=>{ const v=e.target.value; if(v) setKids(prev=>prev.map(c=>c.id===i.kid.id?{...c,tmima:v}:c)); }}>
+                  <option value="">Μεταφορά σε τμήμα…</option>
+                  {TMIMATA.map(t=><option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+              </div>
+            )}
+            {i.dup&&(
+              <div style={{marginTop:8}}>
+                {i.dup.map(c=>(
+                  <div key={c.id} style={{display:"flex",alignItems:"center",gap:10,fontSize:12,padding:"4px 0",flexWrap:"wrap"}}>
+                    <span style={{flex:1,minWidth:200}}><strong>{c.name}</strong> · {tmName(c.tmima)||"—"} · γεν. {c.birthdate||"—"} · {c.mit_name||c.pat_name||"χωρίς γονέα"}</span>
+                    <button className="btn btn-ghost btn-xs" style={{color:"#B91C1C"}} onClick={async()=>{
+                      if(!window.confirm(`Διαγραφή αυτής της εγγραφής του «${c.name}» (${tmName(c.tmima)||"—"});\nΘα διαγραφούν και τα δελτία/μηνύματά της. Δεν αναιρείται.`)) return;
+                      setKids(prev=>prev.filter(k=>k.id!==c.id));
+                      try { if(onDeleteKid) await onDeleteKid(c); } catch(e){ alert("⚠️ "+e.message); }
+                    }}>🗑️ Διαγραφή αυτής</button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {edit&&(
+        <div className="modal-bg" onClick={e=>e.target===e.currentTarget&&setEdit(null)}>
+          <div className="modal">
+            <div className="modal-title">{edit.isNew?"Νέο τμήμα":"Επεξεργασία τμήματος"}<button className="modal-close" onClick={()=>setEdit(null)}>✕</button></div>
+            <div className="fgroup"><label className="flabel">Όνομα τμήματος *</label>
+              <input className="finput" value={edit.name} onChange={e=>setEdit({...edit,name:e.target.value})} placeholder="π.χ. Παιδικό Γ"/></div>
+            <div className="f2">
+              <div className="fgroup"><label className="flabel">Τύπος</label>
+                <select className="finput" value={edit.type} onChange={e=>setEdit({...edit,type:e.target.value})}><option value="vrefiko">Βρεφικό</option><option value="paidiko">Παιδικό</option></select></div>
+              <div className="fgroup"><label className="flabel">Προεπιλεγμένο δίδακτρο (€)</label>
+                <input className="finput" type="number" min="0" value={edit.fee} onChange={e=>setEdit({...edit,fee:e.target.value})}/></div>
+            </div>
+            <div className="fgroup"><label className="flabel">Όνομα υπεύθυνης δασκάλας <span style={{color:"var(--text3)",fontWeight:400}}>(το βλέπουν οι γονείς)</span></label>
+              <input className="finput" value={edit.teacher} onChange={e=>setEdit({...edit,teacher:e.target.value})} placeholder="π.χ. Μαρία Παπαδοπούλου"/></div>
+            <div className="fgroup"><label className="flabel">Χρώμα</label>
+              <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                {TM_COLORS.map(c=><div key={c} onClick={()=>setEdit({...edit,color:c})} style={{width:28,height:28,borderRadius:8,background:c,cursor:"pointer",outline:edit.color===c?"3px solid var(--green)":"none",outlineOffset:2}}/>)}
+              </div></div>
+            <div style={{display:"flex",gap:10,marginTop:6}}>
+              <button className="btn btn-primary" style={{flex:1}} onClick={save} disabled={busy}>{busy?"Αποθήκευση…":"💾 Αποθήκευση"}</button>
+              <button className="btn btn-ghost" onClick={()=>setEdit(null)}>Ακύρωση</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {moveFrom&&(
+        <div className="modal-bg" onClick={e=>e.target===e.currentTarget&&setMoveFrom(null)}>
+          <div className="modal">
+            <div className="modal-title">↪️ Μεταφορά παιδιών<button className="modal-close" onClick={()=>setMoveFrom(null)}>✕</button></div>
+            <div style={{fontSize:13,color:"var(--text2)",marginBottom:14}}>Όλα τα παιδιά του τμήματος <strong>{moveFrom.name}</strong> ({kids.filter(c=>c.tmima===moveFrom.id).length}) θα μεταφερθούν στο τμήμα που θα επιλέξετε.</div>
+            <div className="fgroup"><label className="flabel">Νέο τμήμα</label>
+              <select className="finput" value={moveTo} onChange={e=>setMoveTo(e.target.value)}>
+                <option value="">Επιλέξτε…</option>
+                {TMIMATA.filter(t=>t.id!==moveFrom.id).map(t=><option key={t.id} value={t.id}>{t.name}</option>)}
+              </select></div>
+            <div style={{display:"flex",gap:10}}>
+              <button className="btn btn-primary" style={{flex:1}} onClick={doMove} disabled={!moveTo}>Μεταφορά</button>
+              <button className="btn btn-ghost" onClick={()=>setMoveFrom(null)}>Ακύρωση</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── ΑΝΑΦΟΡΕΣ ────────────────────────────────────────────────────────────────
+function Anafores({kids, user, users=[]}) {
+  const hasKids = kids.length>0;
+  // Αντίγραφο ασφαλείας: όλα τα δεδομένα σε ένα αρχείο που κρατάτε εσείς (μόνο Διοίκηση)
+  const backup = () => {
+    const data = { exported_at:new Date().toISOString(), tmimata:TMIMATA, kids, messages:PT_MESSAGES.list,
+      users:users.map(u=>({ username:u.username, role:u.role, name:u.name, tmima_id:u.tmima_id||null, child_ids:u.child_ids||[] })) };
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:"application/json"}));
+    a.download = `oneirochora-backup-${TODAY}.json`; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href),1500);
+  };
+  const p=kids.filter(c=>c.present).length;
+  const paid=kids.filter(c=>c.didaktra==="paid").length;
+  const rev=kids.filter(c=>c.didaktra==="paid").reduce((s,c)=>s+(Number(c.amount)||0),0);
+  return (
+    <div className="page-in">
+      {user&&user.role==="admin"&&(
+        <div style={{display:"flex",justifyContent:"flex-end",marginBottom:14}}>
+          <button className="btn btn-ghost" onClick={backup}>💾 Αντίγραφο ασφαλείας (λήψη αρχείου)</button>
+        </div>
+      )}
       {!hasKids && (
         <div style={{background:"#FFF8E7",border:"1.5px solid #F5B800",borderRadius:12,padding:"14px 16px",marginBottom:16,fontSize:13,color:"#78350F"}}>
           ℹ️ Δεν υπάρχουν ακόμα παιδιά καταχωρημένα στο Μητρώο — οι αναφορές θα ενημερωθούν αυτόματα μόλις προστεθούν.
@@ -4202,6 +4689,7 @@ export default function App() {
   const uidRef = useRef(null);
   const flushTimer = useRef(null), reloadTimer = useRef(null);
   const flushing = useRef(false), dirty = useRef(false);
+  const [tmVer,setTmVer] = useState(0);                // αλλάζει όταν ενημερώνονται τα τμήματα (ώστε να ξαναζωγραφιστεί η σελίδα)
   const [syncState,setSyncState] = useState("idle");   // idle | saving | saved | error
   const [syncErr,setSyncErr] = useState("");
 
@@ -4249,6 +4737,19 @@ export default function App() {
     } catch(e) { console.error(e); }
   };
   const scheduleReload = () => { clearTimeout(reloadTimer.current); reloadTimer.current = setTimeout(reloadKids, 700); };
+  const reloadTmimata = async () => { if(sb){ try { await sbLoadTmimata(); } catch(e){ console.error(e); } } setTmVer(v=>v+1); };
+  // Διαγραφή παιδιού: καθαρίζει και τους λογαριασμούς γονέα που έδειχναν σε αυτό
+  const onDeleteKid = async (k) => {
+    if(DEMO || !sb) return;
+    const kid = Number(k.id);
+    const affected = users.filter(u=>u.role==="parent" && childIdsOf(u).includes(kid));
+    for(const u of affected){
+      const rest = childIdsOf(u).filter(id=>id!==kid);
+      if(rest.length) await sbAdmin("update",{ id:u.id, child_ids:rest });
+      else await sbAdmin("delete",{ id:u.id });
+    }
+    if(affected.length) await reloadUsers();
+  };
   const reloadUsers = async () => {
     if(!sb) return;
     const { data, error } = await sb.from("profiles").select("*").order("created_at");
@@ -4263,6 +4764,7 @@ export default function App() {
       await sb.auth.signOut();
       throw new Error("Ο λογαριασμός δεν έχει ακόμα δικαιώματα πρόσβασης. Επικοινωνήστε με τη Διοίκηση.");
     }
+    try { await sbLoadTmimata(); } catch(e){ console.error(e); }   // πρώτα τα τμήματα (τα χρειάζονται όλα τα υπόλοιπα)
     const u = toUser(p);
     roleRef.current = u.role; uidRef.current = u.id;
     const [kr, msgsRes, profs] = await Promise.all([
@@ -4305,6 +4807,7 @@ export default function App() {
       .on("postgres_changes",{ event:"UPDATE", schema:"public", table:"pt_messages" }, pl=>PT_MESSAGES.receiveUpdate(pl.new))
       .on("postgres_changes",{ event:"*", schema:"public", table:"kids" }, scheduleReload)
       .on("postgres_changes",{ event:"*", schema:"public", table:"daily_reports" }, scheduleReload)
+      .on("postgres_changes",{ event:"*", schema:"public", table:"tmimata" }, ()=>{ sbLoadTmimata().then(()=>setTmVer(v=>v+1)).catch(()=>{}); })
       .subscribe();
     const onVis = () => { if(document.visibilityState==="visible") scheduleReload(); };
     document.addEventListener("visibilitychange", onVis);
@@ -4329,7 +4832,7 @@ export default function App() {
   },[]);
 
   const recentPtMsgs = ptMsgsForPanel.filter(m=>{
-    if(!user) return false;
+    if(!user || m.from_role!=="parent") return false;
     if(user.role==="admin"||user.role==="secretary") return true;
     if(user.role==="teacher") return m.tmima===(user.tmima_id||user.tmima) || m.to_teacher===user.name;
     return false;
@@ -4416,6 +4919,7 @@ export default function App() {
     { key:"oikonomika",   ico:"euro",   label:"Οικονομικά",          roles:["admin","secretary"] },
     { key:"programma",    ico:"grid",  label:"Πρόγραμμα",           roles:["admin","secretary","teacher"] },
     { key:"anafores",     ico:"chart",  label:"Αναφορές",            roles:["admin","secretary"] },
+    { key:"tmimata",      ico:"smile",  label:"Τμήματα",              roles:["admin"] },
     { key:"xristes",      ico:"users",  label:"Χρήστες",              roles:["admin"] },
   ];
 
@@ -4424,7 +4928,7 @@ export default function App() {
     deltion:"Ημερήσιο Δελτίο", gallery:"Gallery Φωτογραφιών", epikoinonia:"Επικοινωνία",
     calendar:"Ημερολόγιο", dromologia:"Δρομολόγια",
     oikonomika:"Οικονομικά", programma:"Πρόγραμμα", anafores:"Αναφορές",
-    xristes:"Διαχείριση Χρηστών",
+    tmimata:"Τμήματα", xristes:"Διαχείριση Χρηστών",
   };
 
   const SUBS = {
@@ -4460,7 +4964,7 @@ export default function App() {
           <div className="sb-user">
             <div className="sb-av">{user.initials}</div>
             <div><div className="sb-uname">{user.name}</div>
-              <div className="sb-urole">{user.role==="admin"?"Διοίκηση":user.role==="secretary"?"Γραμματεία":`Εκπαιδευτικός${user.tmima?" · "+user.tmima:""}`}</div>
+              <div className="sb-urole">{user.role==="admin"?"Διοίκηση":user.role==="secretary"?"Γραμματεία":`Εκπαιδευτικός${tmName(user.tmima_id)?" · "+tmName(user.tmima_id):""}`}</div>
             </div>
           </div>
           <nav className="sb-nav">
@@ -4547,16 +5051,17 @@ export default function App() {
           </div>
           <div className="content">
             {page==="dashboard"   && <Dashboard   user={user} kids={kids} setPage={setPage}/>}
-            {page==="mitroo"      && <Paidia      user={user} kids={kids} setKids={setKids} onCreateParent={DEMO ? (async()=>{}) : (d=>sbAdmin("create",{ ...d, role:"parent", initials:(d.name||"?").split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase() }))}/>}
+            {page==="mitroo"      && <Paidia      user={user} kids={kids} setKids={setKids} onDeleteKid={onDeleteKid} onCreateParent={DEMO ? (async()=>{}) : (d=>sbAdmin("create",{ ...d, child_ids:[d.child_id], role:"parent", initials:(d.name||"?").split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase() }))}/>}
             {page==="parousies"   && <Parousies   user={user} kids={kids} setKids={setKids}/>}
             {page==="deltion"     && <Deltion     user={user} kids={kids} setKids={setKids}/>}
             {page==="gallery"     && <Gallery     user={user}/>}
-            {page==="epikoinonia" && <Epikoinonia user={user}/>}
+            {page==="epikoinonia" && <Epikoinonia user={user} kids={kids}/>}
             {page==="calendar"    && <Calendar    user={user}/>}
             {page==="dromologia"  && <Dromologia/>}
             {page==="oikonomika"  && <Oikonomika  user={user} kids={kids} setKids={setKids}/>}
             {page==="programma"   && <Programma/>}
-            {page==="anafores"    && <Anafores    kids={kids}/>}
+            {page==="anafores"    && <Anafores    kids={kids} user={user} users={users}/>}
+            {page==="tmimata"     && <Tmimata user={user} kids={kids} setKids={setKids} users={users} reload={reloadTmimata} onDeleteKid={onDeleteKid}/>}
             {page==="xristes"     && <Xristes     users={users} setUsers={setUsers} currentUser={user} kids={kids} reloadUsers={reloadUsers}/>}
           </div>
         </div>
